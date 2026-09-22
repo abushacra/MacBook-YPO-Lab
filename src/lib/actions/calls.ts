@@ -20,11 +20,60 @@ const MAX_SPACE_LENGTH = 120;
 
 const schema = z.object({
   call_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date of the call."),
-  hours_type: z.enum(HOURS_TYPES, { message: "Choose regular or after hours." }),
+  hours_type: z.enum(HOURS_TYPES, { message: "Choose Regular or OT Rate." }),
   call_type: z.enum(CALL_TYPES, { message: "Choose emergency or scheduled." }),
   property_id: z.uuid("Choose a property."),
   space: z.string().max(MAX_SPACE_LENGTH, "That space name is too long."),
+  property_id_2: z.union([z.uuid(), z.literal("")]),
+  space_2: z.string().max(MAX_SPACE_LENGTH, "That space name is too long."),
 });
+
+type ResolvedLocation = {
+  propertyId: string;
+  propertyLabel: string;
+  spaceId: string | null;
+  spaceLabel: string | null;
+};
+
+/**
+ * Turns a property id and a typed space into what gets stored.
+ *
+ * Space is optional and free-text. When it matches one of that property's
+ * managed spaces, ignoring case, it is linked and stored under the list's
+ * spelling — so typing "suite 210" and tapping *Suite 210* land on the same
+ * record. Anything else is kept verbatim as a label with no link.
+ */
+async function resolveLocation(
+  propertyId: string,
+  typedSpace: string,
+): Promise<ResolvedLocation | null> {
+  const { data: property } = await db()
+    .from("properties")
+    .select("id, name")
+    .eq("id", propertyId)
+    .maybeSingle();
+
+  if (!property) return null;
+
+  let spaceId: string | null = null;
+  let spaceLabel: string | null = null;
+
+  if (typedSpace) {
+    const { data: spaces } = await db()
+      .from("spaces")
+      .select("id, name")
+      .eq("property_id", property.id);
+
+    const match = (spaces ?? []).find(
+      (candidate) => candidate.name.toLowerCase() === typedSpace.toLowerCase(),
+    );
+
+    spaceId = match?.id ?? null;
+    spaceLabel = match?.name ?? typedSpace;
+  }
+
+  return { propertyId: property.id, propertyLabel: property.name, spaceId, spaceLabel };
+}
 
 export async function createServiceCall(
   _prev: FormState,
@@ -38,6 +87,8 @@ export async function createServiceCall(
     call_type: text(formData, "call_type"),
     property_id: text(formData, "property_id"),
     space: text(formData, "space"),
+    property_id_2: text(formData, "property_id_2"),
+    space_2: text(formData, "space_2"),
   });
 
   if (!parsed.success) {
@@ -49,35 +100,28 @@ export async function createServiceCall(
 
   const input = parsed.data;
 
-  const { data: property } = await db()
-    .from("properties")
-    .select("id, name")
-    .eq("id", input.property_id)
-    .maybeSingle();
-
-  if (!property) {
+  const primary = await resolveLocation(input.property_id, input.space);
+  if (!primary) {
     return { error: "That property no longer exists.", fieldErrors: { property_id: "Pick again." } };
   }
 
-  // Space is optional and can be typed free-hand. When what was typed matches
-  // one of the property's managed spaces, link to it and store that spelling,
-  // so picking "suite 210" off the list and typing it by hand end up as the
-  // same row. Anything else is kept verbatim as a label with no link.
-  let spaceId: string | null = null;
-  let spaceLabel: string | null = null;
+  // One call can cover two properties, for an engineer who works both in a day.
+  let secondary: ResolvedLocation | null = null;
+  if (input.property_id_2) {
+    if (input.property_id_2 === input.property_id) {
+      return {
+        error: "Pick a different second property.",
+        fieldErrors: { property_id_2: "Already chosen above." },
+      };
+    }
 
-  if (input.space) {
-    const { data: spaces } = await db()
-      .from("spaces")
-      .select("id, name")
-      .eq("property_id", property.id);
-
-    const match = (spaces ?? []).find(
-      (candidate) => candidate.name.toLowerCase() === input.space.toLowerCase(),
-    );
-
-    spaceId = match?.id ?? null;
-    spaceLabel = match?.name ?? input.space;
+    secondary = await resolveLocation(input.property_id_2, input.space_2);
+    if (!secondary) {
+      return {
+        error: "That second property no longer exists.",
+        fieldErrors: { property_id_2: "Pick again." },
+      };
+    }
   }
 
   // What the call is worth, resolved by who is logging it: an admin-set rate
@@ -126,10 +170,14 @@ export async function createServiceCall(
       call_date: input.call_date,
       hours_type: input.hours_type,
       call_type: input.call_type,
-      property_id: property.id,
-      property_label: property.name,
-      space_id: spaceId,
-      space_label: spaceLabel,
+      property_id: primary.propertyId,
+      property_label: primary.propertyLabel,
+      space_id: primary.spaceId,
+      space_label: primary.spaceLabel,
+      property_id_2: secondary?.propertyId ?? null,
+      property_label_2: secondary?.propertyLabel ?? null,
+      space_id_2: secondary?.spaceId ?? null,
+      space_label_2: secondary?.spaceLabel ?? null,
       rate_id: rateId,
       billed_label: billedLabel,
       billed_amount: billedAmount,

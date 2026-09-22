@@ -53,3 +53,10 @@ export function formatDateTime(iso: string): string {
 export function formatLocation(property: string, space: string | null): string {
   return space ? `${property} \u00b7 ${space}` : property;
 }
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Guards ids before they go into a PostgREST filter string. */
+export function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}

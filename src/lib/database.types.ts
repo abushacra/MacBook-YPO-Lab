@@ -146,6 +146,10 @@ export type Database = {
           id: string
           property_id: string
           property_label: string
+          property_id_2: string | null
+          property_label_2: string | null
+          space_id_2: string | null
+          space_label_2: string | null
           rate_id: string | null
           billed_label: string | null
           billed_amount: number | null
@@ -165,6 +169,10 @@ export type Database = {
           id?: string
           property_id: string
           property_label: string
+          property_id_2?: string | null
+          property_label_2?: string | null
+          space_id_2?: string | null
+          space_label_2?: string | null
           rate_id?: string | null
           billed_label?: string | null
           billed_amount?: number | null
@@ -184,6 +192,10 @@ export type Database = {
           id?: string
           property_id?: string
           property_label?: string
+          property_id_2?: string | null
+          property_label_2?: string | null
+          space_id_2?: string | null
+          space_label_2?: string | null
           rate_id?: string | null
           billed_label?: string | null
           billed_amount?: number | null

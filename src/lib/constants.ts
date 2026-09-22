@@ -6,9 +6,14 @@ export type HoursType = (typeof HOURS_TYPES)[number];
 export type CallType = (typeof CALL_TYPES)[number];
 export type TechnicianKind = (typeof TECHNICIAN_KINDS)[number];
 
+/**
+ * Display text for the Service Time field. The stored values stay `regular`
+ * and `after_hours` — renaming them would mean rewriting calls already
+ * logged, and "after hours" is precisely when the OT rate applies.
+ */
 export const HOURS_TYPE_LABELS: Record<HoursType, string> = {
-  regular: "Regular hours",
-  after_hours: "After hours",
+  regular: "Regular",
+  after_hours: "OT Rate",
 };
 
 export const CALL_TYPE_LABELS: Record<CallType, string> = {

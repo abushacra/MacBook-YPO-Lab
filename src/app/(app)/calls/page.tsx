@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { formatDate, formatLocation, formatMoney } from "@/lib/format";
+import { formatDate, formatLocation, formatMoney, isUuid } from "@/lib/format";
 import { CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
 import { PropertyFilter } from "@/components/property-filter";
 
@@ -23,7 +23,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   let query = db()
     .from("service_calls")
     .select(
-      "id, call_date, hours_type, call_type, property_label, space_label, description, follow_up_needed, technician_id, billed_amount",
+      "id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, description, follow_up_needed, technician_id, billed_amount",
     )
     .order("call_date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -31,7 +31,11 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
 
   if (scope === "mine") query = query.eq("technician_id", user.id);
   if (scope === "follow_up") query = query.eq("follow_up_needed", true);
-  if (propertyId) query = query.eq("property_id", propertyId);
+  // A call can name two properties, so the filter has to match either.
+  // The id goes into a raw PostgREST filter string, so it is checked first.
+  if (propertyId && isUuid(propertyId)) {
+    query = query.or(`property_id.eq.${propertyId},property_id_2.eq.${propertyId}`);
+  }
 
   // The roster is small, so a lookup table beats an embedded join here.
   const [{ data: calls }, { data: properties }, { data: technicians }] = await Promise.all([
@@ -127,6 +131,12 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                     )}
                   </div>
                 </div>
+
+                {call.property_label_2 && (
+                  <p className="mt-0.5 text-sm font-semibold text-muted">
+                    + {formatLocation(call.property_label_2, call.space_label_2)}
+                  </p>
+                )}
 
                 {call.description && (
                   <p className="mt-1 line-clamp-2 text-sm text-muted">{call.description}</p>

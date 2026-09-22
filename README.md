@@ -82,9 +82,14 @@ the database, so deactivating someone takes effect immediately.
 
 ## What gets logged
 
-**Service call** — date, regular or after hours, emergency or scheduled, and
-property are required. Space, a description of the work, a follow-up flag with
-notes, and up to eight photos or PDFs are optional.
+**Service call** — date, Service Time (Regular or OT Rate), emergency or
+scheduled, and property are required. Space, a description of the work, a
+follow-up flag with notes, and up to eight photos or PDFs are optional.
+
+A call can cover **two properties**, for an engineer who works both in one day:
+ticking "This call covers a second property" adds a second property and space.
+The two must be different, and filtering by a property finds calls where it is
+either the first or the second.
 
 An outside vendor also gets an optional **amount they are charging** for the
 job. An in-house engineer gets no money field at all: their calls are priced
@@ -132,7 +137,7 @@ global sign-out if a phone is lost.
 | `spaces` | Units, suites, and common areas within a property. Suggestions, not a closed list. |
 | `technicians` | In-house engineers and outside vendors, with PIN hash and admin flag. |
 | `technician_rates` | Per-engineer billing tiers. Exactly one is the active rate. |
-| `service_calls` | One row per logged call. |
+| `service_calls` | One row per logged call, covering one or two properties. |
 | `service_call_photos` | Storage paths of the photos and PDFs attached to a call. |
 | `expenses` | Credit card charges, each assigned to a property. |
 

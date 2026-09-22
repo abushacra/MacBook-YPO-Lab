@@ -13,7 +13,7 @@ export default async function HomePage() {
   const [{ data: recent }, { data: followUps }] = await Promise.all([
     db()
       .from("service_calls")
-      .select("id, call_date, hours_type, call_type, property_label, space_label, follow_up_needed")
+      .select("id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, follow_up_needed")
       .eq("technician_id", user.id)
       .order("call_date", { ascending: false })
       .order("created_at", { ascending: false })
@@ -69,9 +69,16 @@ export default async function HomePage() {
               <li key={call.id}>
                 <Link href={`/calls/${call.id}`} className="card block px-4 py-3 active:bg-brand-50">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold">
-                      {formatLocation(call.property_label, call.space_label)}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        {formatLocation(call.property_label, call.space_label)}
+                      </p>
+                      {call.property_label_2 && (
+                        <p className="text-sm font-semibold text-muted">
+                          + {formatLocation(call.property_label_2, call.space_label_2)}
+                        </p>
+                      )}
+                    </div>
                     <p className="shrink-0 text-xs text-muted">
                       {formatDate(call.call_date, { weekday: undefined, year: undefined })}
                     </p>

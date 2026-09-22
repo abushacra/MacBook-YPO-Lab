@@ -6,15 +6,12 @@ import { createServiceCall } from "@/lib/actions/calls";
 import { EMPTY_FORM_STATE } from "@/lib/form-state";
 import { deviceTodayISO } from "@/lib/format";
 import { Field, FormError } from "@/components/field";
+import { PropertySpaceFields, type PropertyOption } from "@/components/property-space-fields";
+
+export type { PropertyOption };
 import { Segmented } from "@/components/segmented";
 import { MediaUploader } from "@/components/media-uploader";
 import { SubmitButton } from "@/components/submit-button";
-
-export type PropertyOption = {
-  id: string;
-  name: string;
-  spaces: { id: string; name: string }[];
-};
 
 export function ServiceCallForm({
   properties,
@@ -33,6 +30,9 @@ export function ServiceCallForm({
   const [state, formAction] = useActionState(createServiceCall, EMPTY_FORM_STATE);
   const [propertyId, setPropertyId] = useState(properties.length === 1 ? properties[0].id : "");
   const [space, setSpace] = useState("");
+  const [showSecond, setShowSecond] = useState(false);
+  const [propertyId2, setPropertyId2] = useState("");
+  const [space2, setSpace2] = useState("");
   const [followUp, setFollowUp] = useState(false);
   const [uploading, setUploading] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -45,7 +45,6 @@ export function ServiceCallForm({
     if (input && input.value === serverToday) input.value = deviceTodayISO();
   }, [serverToday]);
 
-  const spaces = properties.find((property) => property.id === propertyId)?.spaces ?? [];
   const errors = state.fieldErrors ?? {};
 
   return (
@@ -62,13 +61,13 @@ export function ServiceCallForm({
         />
       </Field>
 
-      <Field label="When" required error={errors.hours_type}>
+      <Field label="Service Time" required error={errors.hours_type}>
         <Segmented
           name="hours_type"
           defaultValue="regular"
           options={[
-            { value: "regular", label: "Regular hours" },
-            { value: "after_hours", label: "After hours", tone: "amber" },
+            { value: "regular", label: "Regular" },
+            { value: "after_hours", label: "OT Rate", tone: "amber" },
           ]}
         />
       </Field>
@@ -84,77 +83,48 @@ export function ServiceCallForm({
         />
       </Field>
 
-      <Field label="Property" htmlFor="property_id" required error={errors.property_id}>
-        <select
-          id="property_id"
-          name="property_id"
-          required
-          value={propertyId}
-          onChange={(event) => setPropertyId(event.target.value)}
-          className="input"
-        >
-          <option value="">Choose a property…</option>
-          {properties.map((property) => (
-            <option key={property.id} value={property.id}>
-              {property.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <PropertySpaceFields
+        properties={properties}
+        suffix=""
+        label={showSecond ? "Property 1" : "Property"}
+        required
+        propertyId={propertyId}
+        onPropertyChange={setPropertyId}
+        space={space}
+        onSpaceChange={setSpace}
+        errors={errors}
+        excludeId={showSecond ? propertyId2 : undefined}
+      />
 
-      <Field
-        label="Space"
-        htmlFor="space"
-        error={errors.space}
-        hint={
-          spaces.length > 0
-            ? "Tap one below, or type anything. Leave blank for the whole property."
-            : "Unit, suite or area. Leave blank for the whole property."
-        }
-      >
-        <input
-          id="space"
-          name="space"
-          type="text"
-          list="space-options"
-          autoComplete="off"
-          enterKeyHint="done"
-          maxLength={120}
-          value={space}
-          onChange={(event) => setSpace(event.target.value)}
-          placeholder={spaces[0] ? `e.g. ${spaces[0].name}` : "Suite 210, Lobby, Unit B\u2026"}
-          className="input"
-        />
+      <div className="card p-4">
+        <label className="flex min-h-13 cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            checked={showSecond}
+            onChange={(event) => setShowSecond(event.target.checked)}
+            className="size-6 shrink-0 rounded accent-brand-600"
+          />
+          <span className="text-base font-semibold">
+            This call covers a second property
+          </span>
+        </label>
 
-        {/* Desktop keyboards get the native suggestion list; phones get the
-            chips below, which are quicker to hit and easier to discover. */}
-        <datalist id="space-options">
-          {spaces.map((option) => (
-            <option key={option.id} value={option.name} />
-          ))}
-        </datalist>
-
-        {spaces.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {spaces.map((option) => {
-              const active = space.trim().toLowerCase() === option.name.toLowerCase();
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setSpace(active ? "" : option.name)}
-                  aria-pressed={active}
-                  className={`chip min-h-10 px-3.5 text-sm ${
-                    active ? "bg-brand-700 text-white" : "border border-hairline bg-white text-ink"
-                  }`}
-                >
-                  {option.name}
-                </button>
-              );
-            })}
+        {showSecond && (
+          <div className="mt-4 space-y-5">
+            <PropertySpaceFields
+              properties={properties}
+              suffix="_2"
+              label="Property 2"
+              propertyId={propertyId2}
+              onPropertyChange={setPropertyId2}
+              space={space2}
+              onSpaceChange={setSpace2}
+              errors={errors}
+              excludeId={propertyId}
+            />
           </div>
         )}
-      </Field>
+      </div>
 
       <Field label="Work completed" htmlFor="description">
         <textarea
