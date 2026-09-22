@@ -27,7 +27,7 @@ export default async function NewServiceCallPage() {
     return (
       <div className="card p-5 text-sm text-muted">
         <p className="font-semibold text-ink">No properties yet.</p>
-        <p className="mt-2">An admin needs to add properties and spaces before calls can be logged.</p>
+        <p className="mt-2">An admin needs to add at least one property before calls can be logged.</p>
         <Link href="/admin" className="btn-secondary mt-4 w-full">
           Go to Admin
         </Link>

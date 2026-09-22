@@ -48,3 +48,8 @@ export function formatDateTime(iso: string): string {
     minute: "2-digit",
   }).format(new Date(iso));
 }
+
+/** "Kapa Plaza · Suite 210", or just the property when no space was recorded. */
+export function formatLocation(property: string, space: string | null): string {
+  return space ? `${property} \u00b7 ${space}` : property;
+}

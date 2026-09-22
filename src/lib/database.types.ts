@@ -147,7 +147,7 @@ export type Database = {
           property_id: string
           property_label: string
           space_id: string | null
-          space_label: string
+          space_label: string | null
           technician_id: string
           updated_at: string
         }
@@ -163,7 +163,7 @@ export type Database = {
           property_id: string
           property_label: string
           space_id?: string | null
-          space_label: string
+          space_label?: string | null
           technician_id: string
           updated_at?: string
         }
@@ -179,7 +179,7 @@ export type Database = {
           property_id?: string
           property_label?: string
           space_id?: string | null
-          space_label?: string
+          space_label?: string | null
           technician_id?: string
           updated_at?: string
         }

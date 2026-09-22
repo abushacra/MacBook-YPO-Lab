@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatLocation } from "@/lib/format";
 import { CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
 
 export const metadata = { title: "Home · Kapa Service Log" };
@@ -45,7 +45,7 @@ export default async function HomePage() {
               <li key={call.id}>
                 <Link href={`/calls/${call.id}`} className="card block px-4 py-3 active:bg-brand-50">
                   <p className="text-sm font-semibold">
-                    {call.property_label} · {call.space_label}
+                    {formatLocation(call.property_label, call.space_label)}
                   </p>
                   <p className="mt-0.5 text-xs text-muted">{formatDate(call.call_date)}</p>
                 </Link>
@@ -70,7 +70,7 @@ export default async function HomePage() {
                 <Link href={`/calls/${call.id}`} className="card block px-4 py-3 active:bg-brand-50">
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-sm font-semibold">
-                      {call.property_label} · {call.space_label}
+                      {formatLocation(call.property_label, call.space_label)}
                     </p>
                     <p className="shrink-0 text-xs text-muted">
                       {formatDate(call.call_date, { weekday: undefined, year: undefined })}

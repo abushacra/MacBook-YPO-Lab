@@ -64,9 +64,14 @@ the database, so deactivating someone takes effect immediately.
 
 ## What gets logged
 
-**Service call** — date, regular or after hours, emergency or scheduled,
-property, and space are required. A description of the work, a follow-up flag
-with notes, and up to eight photos are optional.
+**Service call** — date, regular or after hours, emergency or scheduled, and
+property are required. Space, a description of the work, a follow-up flag with
+notes, and up to eight photos are optional.
+
+Space can be tapped from the property's list, typed free-hand, or left blank
+for whole-property work. A typed value that matches a managed space (ignoring
+case) is linked to it, so "suite 210" and picking *Suite 210* land on the same
+record; anything else is stored as a one-off label.
 
 **Credit card receipt** — amount, date, and the property to charge are required.
 A receipt image or PDF, store, category, notes, and a link to a related service
@@ -97,7 +102,7 @@ global sign-out if a phone is lost.
 | Table | Holds |
 | --- | --- |
 | `properties` | The portfolio. Retired instead of deleted, so old logs still resolve. |
-| `spaces` | Units, suites, and common areas within a property. |
+| `spaces` | Units, suites, and common areas within a property. Suggestions, not a closed list. |
 | `technicians` | In-house engineers and outside vendors, with PIN hash and admin flag. |
 | `service_calls` | One row per logged call. |
 | `service_call_photos` | Storage paths of the photos on a call. |

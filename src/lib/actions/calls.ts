@@ -16,12 +16,14 @@ import {
   toFieldErrors,
 } from "@/lib/actions/shared";
 
+const MAX_SPACE_LENGTH = 120;
+
 const schema = z.object({
   call_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date of the call."),
   hours_type: z.enum(HOURS_TYPES, { message: "Choose regular or after hours." }),
   call_type: z.enum(CALL_TYPES, { message: "Choose emergency or scheduled." }),
   property_id: z.uuid("Choose a property."),
-  space_id: z.uuid("Choose a space."),
+  space: z.string().max(MAX_SPACE_LENGTH, "That space name is too long."),
 });
 
 export async function createServiceCall(
@@ -35,7 +37,7 @@ export async function createServiceCall(
     hours_type: text(formData, "hours_type"),
     call_type: text(formData, "call_type"),
     property_id: text(formData, "property_id"),
-    space_id: text(formData, "space_id"),
+    space: text(formData, "space"),
   });
 
   if (!parsed.success) {
@@ -47,21 +49,35 @@ export async function createServiceCall(
 
   const input = parsed.data;
 
-  // Confirm the space really belongs to the chosen property before trusting
-  // ids that arrived from the browser.
-  const [{ data: property }, { data: space }] = await Promise.all([
-    db().from("properties").select("id, name").eq("id", input.property_id).maybeSingle(),
-    db().from("spaces").select("id, name, property_id").eq("id", input.space_id).maybeSingle(),
-  ]);
+  const { data: property } = await db()
+    .from("properties")
+    .select("id, name")
+    .eq("id", input.property_id)
+    .maybeSingle();
 
   if (!property) {
     return { error: "That property no longer exists.", fieldErrors: { property_id: "Pick again." } };
   }
-  if (!space || space.property_id !== property.id) {
-    return {
-      error: "That space does not belong to the chosen property.",
-      fieldErrors: { space_id: "Pick again." },
-    };
+
+  // Space is optional and can be typed free-hand. When what was typed matches
+  // one of the property's managed spaces, link to it and store that spelling,
+  // so picking "suite 210" off the list and typing it by hand end up as the
+  // same row. Anything else is kept verbatim as a label with no link.
+  let spaceId: string | null = null;
+  let spaceLabel: string | null = null;
+
+  if (input.space) {
+    const { data: spaces } = await db()
+      .from("spaces")
+      .select("id, name")
+      .eq("property_id", property.id);
+
+    const match = (spaces ?? []).find(
+      (candidate) => candidate.name.toLowerCase() === input.space.toLowerCase(),
+    );
+
+    spaceId = match?.id ?? null;
+    spaceLabel = match?.name ?? input.space;
   }
 
   const followUpNeeded = checkbox(formData, "follow_up_needed");
@@ -75,8 +91,8 @@ export async function createServiceCall(
       call_type: input.call_type,
       property_id: property.id,
       property_label: property.name,
-      space_id: space.id,
-      space_label: space.name,
+      space_id: spaceId,
+      space_label: spaceLabel,
       description: optionalText(formData, "description"),
       follow_up_needed: followUpNeeded,
       follow_up_notes: followUpNeeded ? optionalText(formData, "follow_up_notes") : null,

@@ -56,7 +56,7 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
           ← All calls
         </Link>
         <h1 className="mt-2 text-xl font-bold">{call.property_label}</h1>
-        <p className="text-base text-muted">{call.space_label}</p>
+        {call.space_label && <p className="text-base text-muted">{call.space_label}</p>}
       </div>
 
       <div className="flex flex-wrap gap-1.5">

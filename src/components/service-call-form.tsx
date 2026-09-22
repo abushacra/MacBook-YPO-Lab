@@ -25,7 +25,7 @@ export function ServiceCallForm({
 }) {
   const [state, formAction] = useActionState(createServiceCall, EMPTY_FORM_STATE);
   const [propertyId, setPropertyId] = useState(properties.length === 1 ? properties[0].id : "");
-  const [spaceId, setSpaceId] = useState("");
+  const [space, setSpace] = useState("");
   const [followUp, setFollowUp] = useState(false);
   const [uploading, setUploading] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -83,10 +83,7 @@ export function ServiceCallForm({
           name="property_id"
           required
           value={propertyId}
-          onChange={(event) => {
-            setPropertyId(event.target.value);
-            setSpaceId("");
-          }}
+          onChange={(event) => setPropertyId(event.target.value)}
           className="input"
         >
           <option value="">Choose a property…</option>
@@ -100,31 +97,56 @@ export function ServiceCallForm({
 
       <Field
         label="Space"
-        htmlFor="space_id"
-        required
-        error={errors.space_id}
+        htmlFor="space"
+        error={errors.space}
         hint={
-          propertyId && spaces.length === 0
-            ? "This property has no spaces yet — ask an admin to add them."
-            : undefined
+          spaces.length > 0
+            ? "Tap one below, or type anything. Leave blank for the whole property."
+            : "Unit, suite or area. Leave blank for the whole property."
         }
       >
-        <select
-          id="space_id"
-          name="space_id"
-          required
-          value={spaceId}
-          onChange={(event) => setSpaceId(event.target.value)}
-          disabled={!propertyId}
-          className="input disabled:bg-canvas disabled:text-muted"
-        >
-          <option value="">{propertyId ? "Choose a space…" : "Pick a property first"}</option>
-          {spaces.map((space) => (
-            <option key={space.id} value={space.id}>
-              {space.name}
-            </option>
+        <input
+          id="space"
+          name="space"
+          type="text"
+          list="space-options"
+          autoComplete="off"
+          enterKeyHint="done"
+          maxLength={120}
+          value={space}
+          onChange={(event) => setSpace(event.target.value)}
+          placeholder={spaces[0] ? `e.g. ${spaces[0].name}` : "Suite 210, Lobby, Unit B\u2026"}
+          className="input"
+        />
+
+        {/* Desktop keyboards get the native suggestion list; phones get the
+            chips below, which are quicker to hit and easier to discover. */}
+        <datalist id="space-options">
+          {spaces.map((option) => (
+            <option key={option.id} value={option.name} />
           ))}
-        </select>
+        </datalist>
+
+        {spaces.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {spaces.map((option) => {
+              const active = space.trim().toLowerCase() === option.name.toLowerCase();
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setSpace(active ? "" : option.name)}
+                  aria-pressed={active}
+                  className={`chip min-h-10 px-3.5 text-sm ${
+                    active ? "bg-brand-700 text-white" : "border border-hairline bg-white text-ink"
+                  }`}
+                >
+                  {option.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </Field>
 
       <Field label="Work completed" htmlFor="description">

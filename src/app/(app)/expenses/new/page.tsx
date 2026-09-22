@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { formatDate, todayISO } from "@/lib/format";
+import { formatDate, formatLocation, todayISO } from "@/lib/format";
 import { ExpenseForm, type RecentCall } from "@/components/expense-form";
 
 export const metadata = { title: "New receipt · Kapa Service Log" };
@@ -22,7 +22,7 @@ export default async function NewExpensePage() {
 
   const recentCalls: RecentCall[] = (calls ?? []).map((call) => ({
     id: call.id,
-    label: `${formatDate(call.call_date, { weekday: undefined, year: undefined })} — ${call.property_label} · ${call.space_label}`,
+    label: `${formatDate(call.call_date, { weekday: undefined, year: undefined })} — ${formatLocation(call.property_label, call.space_label)}`,
   }));
 
   if (!properties || properties.length === 0) {
