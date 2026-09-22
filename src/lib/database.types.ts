@@ -280,7 +280,14 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      property_usage: {
+        Row: {
+          property_id: string | null
+          service_call_count: number | null
+          expense_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

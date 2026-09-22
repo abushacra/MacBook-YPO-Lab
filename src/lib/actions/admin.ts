@@ -176,6 +176,42 @@ export async function setTechnicianAdmin(formData: FormData): Promise<void> {
   refreshAdminViews();
 }
 
+/**
+ * Removes a property outright, along with its spaces. Only possible while no
+ * service call or receipt references it — those rows are the company's record
+ * of work done and money spent, and the database blocks the delete rather than
+ * cascading into them. Properties that have been used are retired instead.
+ */
+export async function deleteProperty(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = idFrom(formData);
+  if (!id) return;
+
+  const { data: usage } = await db()
+    .from("property_usage")
+    .select("service_call_count, expense_count")
+    .eq("property_id", id)
+    .maybeSingle();
+
+  if ((usage?.service_call_count ?? 0) > 0 || (usage?.expense_count ?? 0) > 0) return;
+
+  await db().from("properties").delete().eq("id", id);
+  refreshAdminViews();
+}
+
+/**
+ * Removes a space. Always safe: service calls keep the space they recorded as
+ * a plain label, so deleting the entry only takes it off the suggestion list.
+ */
+export async function deleteSpace(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = idFrom(formData);
+  if (!id) return;
+
+  await db().from("spaces").delete().eq("id", id);
+  refreshAdminViews();
+}
+
 export async function resetTechnicianPin(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = idFrom(formData);

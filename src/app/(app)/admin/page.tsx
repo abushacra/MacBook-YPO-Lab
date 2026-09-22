@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import {
+  deleteProperty,
+  deleteSpace,
   resetTechnicianPin,
   setPropertyActive,
   setSpaceActive,
@@ -11,6 +13,7 @@ import {
 } from "@/lib/actions/admin";
 import { TECHNICIAN_KIND_LABELS, type TechnicianKind } from "@/lib/constants";
 import { AddPropertyForm, AddSpaceForm, AddTechnicianForm } from "@/components/admin-forms";
+import { ConfirmButton } from "@/components/confirm-button";
 
 export const metadata = { title: "Admin · Kapa Service Log" };
 
@@ -52,10 +55,21 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 }
 
 async function PropertiesTab() {
-  const [{ data: properties }, { data: spaces }] = await Promise.all([
+  const [{ data: properties }, { data: spaces }, { data: usage }] = await Promise.all([
     db().from("properties").select("id, name, address, active").order("name"),
     db().from("spaces").select("id, name, property_id, active").order("name"),
+    db().from("property_usage").select("property_id, service_call_count, expense_count"),
   ]);
+
+  const usageById = new Map(
+    (usage ?? []).map((row) => [
+      row.property_id,
+      {
+        calls: row.service_call_count ?? 0,
+        expenses: row.expense_count ?? 0,
+      },
+    ]),
+  );
 
   const activeProperties = (properties ?? []).filter((property) => property.active);
 
@@ -81,45 +95,67 @@ async function PropertiesTab() {
               const propertySpaces = (spaces ?? []).filter(
                 (space) => space.property_id === property.id,
               );
+              const used = usageById.get(property.id) ?? { calls: 0, expenses: 0 };
+              const inUse = used.calls > 0 || used.expenses > 0;
+
               return (
                 <li key={property.id} className="card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{property.name}</p>
-                      {property.address && (
-                        <p className="truncate text-sm text-muted">{property.address}</p>
-                      )}
-                    </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{property.name}</p>
+                    {property.address && (
+                      <p className="truncate text-sm text-muted">{property.address}</p>
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <form action={setPropertyActive}>
                       <input type="hidden" name="id" value={property.id} />
                       <input type="hidden" name="active" value={property.active ? "false" : "true"} />
-                      <button
-                        type="submit"
-                        className={property.active ? "btn-danger min-h-10 px-3 text-sm" : "btn-secondary min-h-10 px-3 text-sm"}
-                      >
+                      <button type="submit" className="btn-secondary min-h-10 px-3 text-sm">
                         {property.active ? "Retire" : "Restore"}
                       </button>
                     </form>
+
+                    {!inUse && (
+                      <form action={deleteProperty}>
+                        <input type="hidden" name="id" value={property.id} />
+                        <ConfirmButton confirmLabel="Tap again to delete">
+                          Delete
+                        </ConfirmButton>
+                      </form>
+                    )}
                   </div>
+
+                  {inUse ? (
+                    <p className="mt-2 text-xs text-muted">
+                      {countLabel(used.calls, "service call")} and{" "}
+                      {countLabel(used.expenses, "receipt")} logged here, so this property
+                      can&apos;t be deleted. Retire it to take it off the forms.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted">
+                      Nothing logged here yet — deleting removes it and its spaces for good.
+                    </p>
+                  )}
 
                   {!property.active && (
                     <p className="mt-2 text-xs font-semibold text-amber-800">
-                      Retired — hidden from new calls, past logs keep their history.
+                      Retired — hidden from new calls and receipts.
                     </p>
                   )}
 
                   {propertySpaces.length > 0 && (
                     <ul className="mt-3 divide-y divide-hairline border-t border-hairline">
                       {propertySpaces.map((space) => (
-                        <li
-                          key={space.id}
-                          className="flex items-center justify-between gap-3 py-2"
-                        >
+                        <li key={space.id} className="flex items-center justify-between gap-2 py-2">
                           <span
-                            className={`text-sm ${space.active ? "" : "text-muted line-through"}`}
+                            className={`min-w-0 flex-1 truncate text-sm ${
+                              space.active ? "" : "text-muted line-through"
+                            }`}
                           >
                             {space.name}
                           </span>
+
                           <form action={setSpaceActive}>
                             <input type="hidden" name="id" value={space.id} />
                             <input
@@ -129,10 +165,21 @@ async function PropertiesTab() {
                             />
                             <button
                               type="submit"
-                              className="min-h-9 rounded-lg px-3 text-sm font-semibold text-brand-700"
+                              className="min-h-9 rounded-lg px-2.5 text-sm font-semibold text-brand-700"
                             >
                               {space.active ? "Retire" : "Restore"}
                             </button>
+                          </form>
+
+                          <form action={deleteSpace}>
+                            <input type="hidden" name="id" value={space.id} />
+                            <ConfirmButton
+                              confirmLabel="Tap again"
+                              className="min-h-9 rounded-lg px-2.5 text-sm font-semibold text-red-700"
+                              confirmClassName="min-h-9 rounded-lg bg-red-600 px-2.5 text-sm font-semibold text-white"
+                            >
+                              Delete
+                            </ConfirmButton>
                           </form>
                         </li>
                       ))}
@@ -148,6 +195,10 @@ async function PropertiesTab() {
       </section>
     </div>
   );
+}
+
+function countLabel(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 /** Loads the roster and resolves lockouts outside of render, which must stay pure. */
