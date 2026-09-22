@@ -146,6 +146,9 @@ export type Database = {
           id: string
           property_id: string
           property_label: string
+          rate_id: string | null
+          billed_label: string | null
+          billed_amount: number | null
           space_id: string | null
           space_label: string | null
           technician_id: string
@@ -162,6 +165,9 @@ export type Database = {
           id?: string
           property_id: string
           property_label: string
+          rate_id?: string | null
+          billed_label?: string | null
+          billed_amount?: number | null
           space_id?: string | null
           space_label?: string | null
           technician_id: string
@@ -178,6 +184,9 @@ export type Database = {
           id?: string
           property_id?: string
           property_label?: string
+          rate_id?: string | null
+          billed_label?: string | null
+          billed_amount?: number | null
           space_id?: string | null
           space_label?: string | null
           technician_id?: string
@@ -235,6 +244,44 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_rates: {
+        Row: {
+          id: string
+          technician_id: string
+          label: string
+          amount: number
+          sort_order: number
+          is_primary: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          technician_id: string
+          label: string
+          amount: number
+          sort_order?: number
+          is_primary?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          technician_id?: string
+          label?: string
+          amount?: number
+          sort_order?: number
+          is_primary?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_rates_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
             referencedColumns: ["id"]
           },
         ]

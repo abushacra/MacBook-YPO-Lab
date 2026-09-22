@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
-import { addProperty, addSpace, addTechnician } from "@/lib/actions/admin";
+import { addProperty, addSpace, addTechnician, saveTechnicianRates } from "@/lib/actions/admin";
 import { EMPTY_FORM_STATE, type FormState } from "@/lib/form-state";
 import { TECHNICIAN_KIND_LABELS, TECHNICIAN_KINDS } from "@/lib/constants";
 import { Field, FormError } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
+import { RateRows, type RateRow } from "@/components/rate-rows";
 
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
@@ -65,6 +66,7 @@ export function AddSpaceForm({ properties }: { properties: { id: string; name: s
 
 export function AddTechnicianForm() {
   const { state, formAction, formRef } = useResettingAction(addTechnician);
+  const [kind, setKind] = useState<string>("in_house");
 
   return (
     <form ref={formRef} action={formAction} className="card space-y-4 p-4">
@@ -73,10 +75,17 @@ export function AddTechnicianForm() {
       </Field>
 
       <Field label="Type" htmlFor="new-tech-kind" required error={state.fieldErrors?.kind}>
-        <select id="new-tech-kind" name="kind" required defaultValue="in_house" className="input">
-          {TECHNICIAN_KINDS.map((kind) => (
-            <option key={kind} value={kind}>
-              {TECHNICIAN_KIND_LABELS[kind]}
+        <select
+          id="new-tech-kind"
+          name="kind"
+          required
+          value={kind}
+          onChange={(event) => setKind(event.target.value)}
+          className="input"
+        >
+          {TECHNICIAN_KINDS.map((option) => (
+            <option key={option} value={option}>
+              {TECHNICIAN_KIND_LABELS[option]}
             </option>
           ))}
         </select>
@@ -91,12 +100,54 @@ export function AddTechnicianForm() {
         <span className="text-base font-semibold">Can manage properties and people</span>
       </label>
 
+      {kind === "in_house" ? (
+        <div>
+          <p className="field-label">Service call rates</p>
+          <p className="mb-3 text-xs text-muted">
+            What this engineer is paid per completed call. They pick one of
+            these when logging a call.
+          </p>
+          <RateRows />
+        </div>
+      ) : (
+        <p className="rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-900">
+          Vendors enter the amount they agreed on each call, so there are no
+          rates to set here.
+        </p>
+      )}
+
       <p className="rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-900">
         They choose their own 4-digit PIN the first time they open the app.
       </p>
 
       <FormError message={state.error} />
       <SubmitButton pendingLabel="Adding…">Add person</SubmitButton>
+    </form>
+  );
+}
+
+/** Edits the rate tiers of an engineer already on the list. */
+export function TechnicianRatesForm({
+  technicianId,
+  rates,
+}: {
+  technicianId: string;
+  rates: RateRow[];
+}) {
+  const [state, formAction] = useActionState(saveTechnicianRates, EMPTY_FORM_STATE);
+
+  return (
+    <form action={formAction} className="mt-3 border-t border-hairline pt-3">
+      <input type="hidden" name="id" value={technicianId} />
+      <p className="field-label">Service call rates</p>
+      <RateRows rates={rates} />
+      <FormError message={state.error} />
+      <div className="mt-3 flex items-center gap-3">
+        <SubmitButton className="btn-secondary min-h-10 px-3 text-sm" pendingLabel="Saving…">
+          Save rates
+        </SubmitButton>
+        {state.ok && <span className="text-sm font-semibold text-emerald-700">Saved.</span>}
+      </div>
     </form>
   );
 }

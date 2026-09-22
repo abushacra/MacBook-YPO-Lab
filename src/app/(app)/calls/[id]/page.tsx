@@ -15,7 +15,7 @@ function one(value: string | string[] | undefined): string {
 }
 
 export default async function ServiceCallPage({ params, searchParams }: PageProps<"/calls/[id]">) {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
   const justSaved = one((await searchParams).saved) === "1";
 
@@ -71,6 +71,14 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
           value={`${technician?.name ?? "Unknown"}${technician?.company ? ` · ${technician.company}` : ""}`}
         />
         <Row label="Logged at" value={formatDateTime(call.created_at)} />
+        {/* Pay rates stay admin-only; a vendor still sees what they quoted. */}
+        {call.billed_amount != null &&
+          (user.is_admin || (user.kind !== "in_house" && call.technician_id === user.id)) && (
+            <Row
+              label={call.billed_label ?? "Billed"}
+              value={formatMoney(call.billed_amount)}
+            />
+          )}
       </dl>
 
       {call.description && (

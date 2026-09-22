@@ -8,7 +8,7 @@ import { ServiceCallForm, type PropertyOption } from "@/components/service-call-
 export const metadata = { title: "New service call · Kapa Service Log" };
 
 export default async function NewServiceCallPage() {
-  await requireUser();
+  const user = await requireUser();
 
   const [{ data: properties }, { data: spaces }] = await Promise.all([
     db().from("properties").select("id, name").eq("active", true).order("name"),
@@ -38,7 +38,11 @@ export default async function NewServiceCallPage() {
   return (
     <>
       <h1 className="mb-5 text-xl font-bold">New service call</h1>
-      <ServiceCallForm properties={options} serverToday={todayISO()} />
+      <ServiceCallForm
+        properties={options}
+        isVendor={user.kind !== "in_house"}
+        serverToday={todayISO()}
+      />
     </>
   );
 }

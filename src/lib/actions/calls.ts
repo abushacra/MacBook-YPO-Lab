@@ -80,6 +80,43 @@ export async function createServiceCall(
     spaceLabel = match?.name ?? input.space;
   }
 
+  // What the call is worth, resolved by who is logging it: an admin-set rate
+  // for in-house engineers, the amount they agreed for vendors.
+  let rateId: string | null = null;
+  let billedLabel: string | null = null;
+  let billedAmount: number | null = null;
+
+  if (user.kind === "in_house") {
+    // Priced from the tier an admin marked active for this engineer. Nothing
+    // about the rate comes from the form, so an engineer can neither see their
+    // rate nor influence what a call is billed at.
+    const { data: rate } = await db()
+      .from("technician_rates")
+      .select("id, label, amount")
+      .eq("technician_id", user.id)
+      .eq("is_primary", true)
+      .maybeSingle();
+
+    if (rate) {
+      rateId = rate.id;
+      billedLabel = rate.label;
+      billedAmount = rate.amount;
+    }
+  } else {
+    const raw = text(formData, "billed_amount").replace(/[$,\s]/g, "");
+    if (raw !== "") {
+      const amount = Number(raw);
+      if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) {
+        return {
+          error: "Check the amount you are charging.",
+          fieldErrors: { billed_amount: "Enter a dollar amount." },
+        };
+      }
+      billedLabel = "Agreed amount";
+      billedAmount = Math.round(amount * 100) / 100;
+    }
+  }
+
   const followUpNeeded = checkbox(formData, "follow_up_needed");
 
   const { data: created, error } = await db()
@@ -93,6 +130,9 @@ export async function createServiceCall(
       property_label: property.name,
       space_id: spaceId,
       space_label: spaceLabel,
+      rate_id: rateId,
+      billed_label: billedLabel,
+      billed_amount: billedAmount,
       description: optionalText(formData, "description"),
       follow_up_needed: followUpNeeded,
       follow_up_notes: followUpNeeded ? optionalText(formData, "follow_up_notes") : null,

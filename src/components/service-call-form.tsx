@@ -18,9 +18,16 @@ export type PropertyOption = {
 
 export function ServiceCallForm({
   properties,
+  isVendor,
   serverToday,
 }: {
   properties: PropertyOption[];
+  /**
+   * Vendors quote each job, so they get an amount field. In-house engineers
+   * are priced from the rate an admin set for them, which is deliberately not
+   * shown or editable here.
+   */
+  isVendor: boolean;
   serverToday: string;
 }) {
   const [state, formAction] = useActionState(createServiceCall, EMPTY_FORM_STATE);
@@ -158,6 +165,29 @@ export function ServiceCallForm({
           className="textarea"
         />
       </Field>
+
+      {isVendor ? (
+        <Field
+          label="Amount you are charging"
+          htmlFor="billed_amount"
+          error={errors.billed_amount}
+          hint="The agreed price for this work. Leave blank if it is covered another way."
+        >
+          <div className="relative">
+            <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-xl font-bold text-muted">
+              $
+            </span>
+            <input
+              id="billed_amount"
+              name="billed_amount"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              className="input pl-9 text-xl font-bold"
+            />
+          </div>
+        </Field>
+      ) : null}
 
       <div className="card p-4">
         <label className="flex min-h-13 cursor-pointer items-center gap-3">

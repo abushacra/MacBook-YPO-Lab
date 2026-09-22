@@ -12,7 +12,13 @@ import {
   setTechnicianAdmin,
 } from "@/lib/actions/admin";
 import { TECHNICIAN_KIND_LABELS, type TechnicianKind } from "@/lib/constants";
-import { AddPropertyForm, AddSpaceForm, AddTechnicianForm } from "@/components/admin-forms";
+import { formatMoney } from "@/lib/format";
+import {
+  AddPropertyForm,
+  AddSpaceForm,
+  AddTechnicianForm,
+  TechnicianRatesForm,
+} from "@/components/admin-forms";
 import { ConfirmButton } from "@/components/confirm-button";
 
 export const metadata = { title: "Admin · Kapa Service Log" };
@@ -203,15 +209,28 @@ function countLabel(count: number, noun: string): string {
 
 /** Loads the roster and resolves lockouts outside of render, which must stay pure. */
 async function loadPeople() {
-  const { data } = await db()
-    .from("technicians")
-    .select("id, name, company, kind, is_admin, active, pin_hash, locked_until")
-    .order("name");
+  const [{ data }, { data: rates }] = await Promise.all([
+    db()
+      .from("technicians")
+      .select("id, name, company, kind, is_admin, active, pin_hash, locked_until")
+      .order("name"),
+    db()
+      .from("technician_rates")
+      .select("technician_id, label, amount, sort_order, is_primary")
+      .order("sort_order"),
+  ]);
 
   const now = Date.now();
   return (data ?? []).map((person) => ({
     ...person,
     locked: person.locked_until != null && new Date(person.locked_until).getTime() > now,
+    rates: (rates ?? [])
+      .filter((rate) => rate.technician_id === person.id)
+      .map((rate) => ({
+        label: rate.label,
+        amount: rate.amount,
+        isPrimary: rate.is_primary,
+      })),
   }));
 }
 
@@ -252,7 +271,28 @@ async function PeopleTab({ adminId }: { adminId: string }) {
                   {!person.active && <span className="chip bg-slate-200 text-slate-700">Inactive</span>}
                   {!person.pin_hash && <span className="chip bg-amber-100 text-amber-900">PIN not set</span>}
                   {locked && <span className="chip bg-red-100 text-red-800">Locked out</span>}
+                  {person.kind === "in_house" && person.rates.length === 0 && (
+                    <span className="chip bg-amber-100 text-amber-900">No rates set</span>
+                  )}
                 </div>
+
+                {person.kind === "in_house" && person.rates.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {person.rates.map((rate) => (
+                      <li
+                        key={rate.label}
+                        className={`chip ${
+                          rate.isPrimary
+                            ? "bg-brand-100 text-brand-800"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {rate.label} · {formatMoney(rate.amount)}
+                        {rate.isPrimary && " · in use"}
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(person.pin_hash || locked) && (
@@ -287,6 +327,15 @@ async function PeopleTab({ adminId }: { adminId: string }) {
                     </>
                   )}
                 </div>
+
+                {person.kind === "in_house" && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+                      {person.rates.length > 0 ? "Edit rates" : "Set rates"}
+                    </summary>
+                    <TechnicianRatesForm technicianId={person.id} rates={person.rates} />
+                  </details>
+                )}
               </li>
             );
           })}

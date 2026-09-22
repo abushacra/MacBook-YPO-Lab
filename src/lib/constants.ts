@@ -31,3 +31,18 @@ export const EXPENSE_CATEGORIES = [
   "Subcontractor",
   "Other",
 ] as const;
+
+/**
+ * Labels pre-filled for a new in-house engineer's three standard tiers, by
+ * role. Usually only the row matching the person's own role carries a rate and
+ * the rest are left blank. Labels are editable and nothing in the app matches
+ * on these strings.
+ */
+export const DEFAULT_RATE_TIERS = [
+  "Chief Engineer",
+  "Building Engineer",
+  "Assistant Engineer",
+] as const;
+
+/** How many rate rows the admin screens show per engineer: three plus a custom. */
+export const RATE_SLOTS = DEFAULT_RATE_TIERS.length + 1;

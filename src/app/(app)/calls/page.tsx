@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { formatDate, formatLocation } from "@/lib/format";
+import { formatDate, formatLocation, formatMoney } from "@/lib/format";
 import { CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
 import { PropertyFilter } from "@/components/property-filter";
 
@@ -23,7 +23,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   let query = db()
     .from("service_calls")
     .select(
-      "id, call_date, hours_type, call_type, property_label, space_label, description, follow_up_needed, technician_id",
+      "id, call_date, hours_type, call_type, property_label, space_label, description, follow_up_needed, technician_id, billed_amount",
     )
     .order("call_date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -41,6 +41,19 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   ]);
 
   const nameById = new Map((technicians ?? []).map((row) => [row.id, row.name]));
+
+  /**
+   * In-house engineers are never shown what a call was billed at — that is
+   * their pay rate, and it is admin-only. A vendor sees the amounts they
+   * quoted themselves.
+   */
+  const canSeeAmount = (technicianId: string) =>
+    user.is_admin || (user.kind !== "in_house" && technicianId === user.id);
+
+  const billableTotal = (calls ?? []).reduce(
+    (sum, call) => sum + (canSeeAmount(call.technician_id) ? (call.billed_amount ?? 0) : 0),
+    0,
+  );
 
   const scopes = [
     { value: "all", label: "All" },
@@ -89,6 +102,13 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
         extraParams={scope !== "all" ? { scope } : {}}
       />
 
+      {user.is_admin && billableTotal > 0 && (
+        <div className="card flex items-center justify-between px-4 py-3">
+          <span className="text-sm font-semibold text-muted">Billable total shown</span>
+          <span className="text-lg font-bold">{formatMoney(billableTotal)}</span>
+        </div>
+      )}
+
       {calls && calls.length > 0 ? (
         <ul className="space-y-2">
           {calls.map((call) => (
@@ -98,9 +118,14 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                   <p className="text-sm font-semibold">
                     {formatLocation(call.property_label, call.space_label)}
                   </p>
-                  <p className="shrink-0 text-xs text-muted">
-                    {formatDate(call.call_date, { weekday: undefined, year: undefined })}
-                  </p>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs text-muted">
+                      {formatDate(call.call_date, { weekday: undefined, year: undefined })}
+                    </p>
+                    {canSeeAmount(call.technician_id) && call.billed_amount != null && (
+                      <p className="text-sm font-bold">{formatMoney(call.billed_amount)}</p>
+                    )}
+                  </div>
                 </div>
 
                 {call.description && (

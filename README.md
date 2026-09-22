@@ -48,6 +48,24 @@ From there, open **Admin → People** to add the real engineers and vendors, and
 **Admin → Properties** to replace the three sample properties with Kapa's
 portfolio. Once a real administrator exists, deactivate `Kapa Admin`.
 
+## Paying engineers
+
+Each in-house engineer has rate tiers set in **Admin → People**: three named by
+role (Chief Engineer, Building Engineer, Assistant Engineer) plus a custom one.
+Usually only the row matching that person's role carries a rate; the rest are
+left blank. One tier is marked active, and every call that engineer logs is
+priced from it.
+
+**Rates are admin-only.** Engineers never see a rate on the call form, in their
+history, or anywhere else — the amount is read from the database when the call
+is saved, so it cannot be seen or influenced from the form. Admins see the
+amount on each call plus a billable total for whatever filter is applied on the
+Calls screen. Vendors see the amounts they quoted themselves, and nobody else's.
+
+Amounts are snapshots. Re-pricing a tier, renaming it, or deleting it never
+alters calls already logged, so what someone was paid last month stays what
+they were paid.
+
 ## How people sign in
 
 There are no passwords or email invitations. Someone is added in Admin, and the
@@ -67,6 +85,10 @@ the database, so deactivating someone takes effect immediately.
 **Service call** — date, regular or after hours, emergency or scheduled, and
 property are required. Space, a description of the work, a follow-up flag with
 notes, and up to eight photos or PDFs are optional.
+
+An outside vendor also gets an optional **amount they are charging** for the
+job. An in-house engineer gets no money field at all: their calls are priced
+automatically from the rate an admin set for them.
 
 Space can be tapped from the property's list, typed free-hand, or left blank
 for whole-property work. A typed value that matches a managed space (ignoring
@@ -109,6 +131,7 @@ global sign-out if a phone is lost.
 | `properties` | The portfolio. Retired instead of deleted, so old logs still resolve. |
 | `spaces` | Units, suites, and common areas within a property. Suggestions, not a closed list. |
 | `technicians` | In-house engineers and outside vendors, with PIN hash and admin flag. |
+| `technician_rates` | Per-engineer billing tiers. Exactly one is the active rate. |
 | `service_calls` | One row per logged call. |
 | `service_call_photos` | Storage paths of the photos and PDFs attached to a call. |
 | `expenses` | Credit card charges, each assigned to a property. |

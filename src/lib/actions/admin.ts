@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { TECHNICIAN_KINDS } from "@/lib/constants";
+import { RATE_SLOTS, TECHNICIAN_KINDS } from "@/lib/constants";
 import {
   type FormState,
   checkbox,
@@ -18,6 +18,43 @@ function refreshAdminViews(): void {
   revalidatePath("/admin");
   revalidatePath("/calls/new");
   revalidatePath("/expenses/new");
+}
+
+
+type ParsedRate = { label: string; amount: number; sort_order: number; is_primary: boolean };
+
+/**
+ * Reads the rate rows off a form. A row counts only when it has both a label
+ * and a usable amount, so blank slots — including an unused custom tier — are
+ * simply skipped rather than saved as zeroes.
+ */
+function parseRates(formData: FormData): ParsedRate[] {
+  const rates: ParsedRate[] = [];
+
+  for (let slot = 0; slot < RATE_SLOTS; slot += 1) {
+    const label = text(formData, `rate_label_${slot}`);
+    const raw = text(formData, `rate_amount_${slot}`).replace(/[$,\s]/g, "");
+    if (!label || raw === "") continue;
+
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) continue;
+
+    rates.push({
+      label: label.slice(0, 80),
+      amount: Math.round(amount * 100) / 100,
+      sort_order: slot,
+      is_primary: false,
+    });
+  }
+
+  // Exactly one tier prices this engineer's calls. The admin picks it; if their
+  // pick has no amount, the first filled tier stands in so an engineer is never
+  // left unpriced.
+  const chosenSlot = Number(text(formData, "primary_slot"));
+  const chosen = rates.find((rate) => rate.sort_order === chosenSlot) ?? rates[0];
+  if (chosen) chosen.is_primary = true;
+
+  return rates;
 }
 
 const propertySchema = z.object({
@@ -100,20 +137,35 @@ export async function addTechnician(_prev: FormState, formData: FormData): Promi
 
   // No PIN is set here: the person picks their own the first time they open
   // the app, so nobody has to hand out a starter PIN.
-  const { error } = await db().from("technicians").insert({
-    name: parsed.data.name,
-    kind: parsed.data.kind,
-    company: optionalText(formData, "company"),
-    is_admin: checkbox(formData, "is_admin"),
-  });
+  const { data: created, error } = await db()
+    .from("technicians")
+    .insert({
+      name: parsed.data.name,
+      kind: parsed.data.kind,
+      company: optionalText(formData, "company"),
+      is_admin: checkbox(formData, "is_admin"),
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !created) {
     return {
       error:
-        error.code === "23505"
+        error?.code === "23505"
           ? "Someone with that name is already on the list."
           : "Could not add the person.",
     };
+  }
+
+  // Rates are for in-house engineers, who are paid per call. Vendors quote
+  // their own amount on each call instead.
+  if (parsed.data.kind === "in_house") {
+    const rates = parseRates(formData);
+    if (rates.length > 0) {
+      await db()
+        .from("technician_rates")
+        .insert(rates.map((rate) => ({ ...rate, technician_id: created.id })));
+    }
   }
 
   refreshAdminViews();
@@ -210,6 +262,42 @@ export async function deleteSpace(formData: FormData): Promise<void> {
 
   await db().from("spaces").delete().eq("id", id);
   refreshAdminViews();
+}
+
+/**
+ * Replaces an engineer's rate tiers wholesale. Past service calls keep the
+ * label and amount they were logged with, so re-pricing never rewrites what
+ * someone has already been paid for.
+ */
+export async function saveTechnicianRates(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+
+  const id = idFrom(formData);
+  if (!id) return { error: "Unknown person." };
+
+  const { data: technician } = await db()
+    .from("technicians")
+    .select("id, kind")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!technician) return { error: "Unknown person." };
+  if (technician.kind !== "in_house") {
+    return { error: "Rates apply to in-house engineers. Vendors quote each call." };
+  }
+
+  const rates = parseRates(formData);
+
+  await db().from("technician_rates").delete().eq("technician_id", id);
+  if (rates.length > 0) {
+    const { error } = await db()
+      .from("technician_rates")
+      .insert(rates.map((rate) => ({ ...rate, technician_id: id })));
+    if (error) return { error: "Could not save the rates." };
+  }
+
+  refreshAdminViews();
+  return { ok: true };
 }
 
 export async function resetTechnicianPin(formData: FormData): Promise<void> {
