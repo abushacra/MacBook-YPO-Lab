@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Kapa Service Log">
+  <rect width="512" height="512" rx="112" fill="#1b5b8b"/>
+  <g stroke="#ffffff" stroke-width="60" stroke-linecap="round" fill="none">
+    <path d="M178 116 V396"/>
+    <path d="M250 256 L372 120"/>
+    <path d="M250 256 L372 392"/>
+  </g>
+</svg>

@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eef6fb;
+  --color-brand-100: #d5e9f5;
+  --color-brand-200: #aed3ea;
+  --color-brand-300: #7bb5da;
+  --color-brand-400: #4791c5;
+  --color-brand-500: #2673a9;
+  --color-brand-600: #1b5b8b;
+  --color-brand-700: #174a71;
+  --color-brand-800: #163d5c;
+  --color-brand-900: #14334c;
+
+  --color-ink: #10202c;
+  --color-muted: #5b6b78;
+  --color-hairline: #dce4ea;
+  --color-canvas: #f2f5f8;
+}
+
+/*
+ * The app is light-only on purpose: engineers use it in bright daylight and in
+ * dark mechanical rooms, and a single high-contrast theme renders predictably
+ * in both. Pinning color-scheme stops phones in dark mode from painting native
+ * form controls dark against light surfaces.
+ */
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: var(--color-canvas);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+/*
+ * Declared with @utility rather than @layer components so they can be composed
+ * with @apply by each other — Tailwind v4 only resolves registered utilities.
+ */
+@utility card {
+  @apply rounded-2xl border border-hairline bg-white shadow-sm;
+}
+
+@utility field-label {
+  @apply mb-2 block text-sm font-semibold text-ink;
+}
+
+@utility field-hint {
+  @apply mt-1.5 block text-xs text-muted;
+}
+
+/*
+ * 16px minimum font size: anything smaller makes iOS Safari zoom the page when
+ * the field takes focus.
+ */
+@utility input {
+  @apply block min-h-13 w-full rounded-xl border border-hairline bg-white px-4 py-3 text-base
+    text-ink placeholder:text-muted/70 focus:border-brand-500 focus:ring-2 focus:ring-brand-200
+    focus:outline-none;
+}
+
+@utility textarea {
+  @apply input min-h-28 resize-y py-3 leading-relaxed;
+}
+
+@utility btn {
+  @apply inline-flex min-h-13 items-center justify-center gap-2 rounded-xl px-5 text-base
+    font-semibold transition-colors select-none focus-visible:ring-2 focus-visible:ring-brand-300
+    focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-55;
+}
+
+@utility btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800;
+}
+
+@utility btn-secondary {
+  @apply btn border border-hairline bg-white text-ink hover:bg-brand-50 active:bg-brand-100;
+}
+
+@utility btn-danger {
+  @apply btn border border-red-200 bg-white text-red-700 hover:bg-red-50 active:bg-red-100;
+}
+
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold
+    whitespace-nowrap;
+}
+
+@utility section-heading {
+  @apply px-1 text-xs font-bold tracking-wider text-muted uppercase;
+}
+
+/* Keeps a numeric keypad without the desktop spinner arrows. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
