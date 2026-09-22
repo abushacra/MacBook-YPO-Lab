@@ -183,11 +183,15 @@ export function ServiceCallForm({
         )}
       </div>
 
-      <Field label="Photos of the work" hint="Up to 8. They upload while you keep typing.">
+      <Field
+        label="Photos and files"
+        hint="Up to 8 photos or PDFs, from the camera or your phone. They upload while you keep typing."
+      >
         <MediaUploader
           name="photos"
           bucket="service-photos"
-          addLabel="Add photos"
+          browseLabel="Choose files"
+          accept="image/*,application/pdf"
           multiple
           maxFiles={8}
           onBusyChange={setUploading}

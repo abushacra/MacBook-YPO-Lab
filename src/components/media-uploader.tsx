@@ -8,7 +8,6 @@ type Item = {
   key: string;
   fileName: string;
   previewUrl: string | null;
-  isPdf: boolean;
   status: "uploading" | "done" | "error";
   path?: string;
   error?: string;
@@ -18,7 +17,8 @@ type Props = {
   /** Name of the hidden inputs carrying finished storage paths to the action. */
   name: string;
   bucket: "service-photos" | "receipts";
-  addLabel: string;
+  /** Label for the file-picker button, e.g. "Choose file". */
+  browseLabel: string;
   multiple?: boolean;
   maxFiles?: number;
   accept?: string;
@@ -29,10 +29,19 @@ const MAX_DIMENSION = 1600;
 const JPEG_QUALITY = 0.72;
 
 /**
+ * Vercel refuses request bodies over 4.5MB, so anything that survives
+ * downscaling has to be rejected here with a message rather than failing
+ * halfway through the upload.
+ */
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+const IMAGE_TYPES = "image/*";
+
+/**
  * Phone cameras produce 3-5MB files, which crawl over a cellular connection.
  * Downscaling to 1600px in the browser keeps the upload small enough to finish
- * while the engineer is still typing the description. HEIC and anything the
- * browser cannot decode is sent through untouched.
+ * while the engineer is still typing the description. PDFs, HEIC and anything
+ * else the browser cannot decode are sent through untouched.
  */
 async function shrinkImage(file: File): Promise<File> {
   if (!file.type.startsWith("image/") || typeof createImageBitmap !== "function") return file;
@@ -67,13 +76,17 @@ async function shrinkImage(file: File): Promise<File> {
   }
 }
 
+function formatSize(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
 export function MediaUploader({
   name,
   bucket,
-  addLabel,
+  browseLabel,
   multiple = false,
   maxFiles = 8,
-  accept = "image/*",
+  accept = "image/*,application/pdf",
   onBusyChange,
 }: Props) {
   const inputId = useId();
@@ -113,7 +126,7 @@ export function MediaUploader({
         setItems((current) =>
           current.map((item) =>
             item.key === key
-              ? { ...item, status: "error", error: "No connection. Tap to retry." }
+              ? { ...item, status: "error", error: "No connection. Remove and try again." }
               : item,
           ),
         );
@@ -126,18 +139,32 @@ export function MediaUploader({
     if (!fileList?.length) return;
 
     const room = Math.max(0, (multiple ? maxFiles : 1) - items.length);
-    const files = Array.from(fileList).slice(0, room);
+    const picked = Array.from(fileList).slice(0, room);
 
-    for (const original of files) {
+    for (const original of picked) {
       const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const file = await shrinkImage(original);
-      const isPdf = file.type === "application/pdf";
-      const previewUrl = isPdf ? null : URL.createObjectURL(file);
+      const isImage = file.type.startsWith("image/");
+      const previewUrl = isImage ? URL.createObjectURL(file) : null;
       if (previewUrl) objectUrls.current.push(previewUrl);
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setItems((current) => [
+          ...current,
+          {
+            key,
+            fileName: file.name,
+            previewUrl,
+            status: "error",
+            error: `${formatSize(file.size)} — too big. Max 4MB.`,
+          },
+        ]);
+        continue;
+      }
 
       setItems((current) => [
         ...current,
-        { key, fileName: file.name, previewUrl, isPdf, status: "uploading" },
+        { key, fileName: file.name, previewUrl, status: "uploading" },
       ]);
 
       void upload(key, file);
@@ -161,14 +188,13 @@ export function MediaUploader({
             >
               {item.previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- local blob preview, never optimized
-                <img
-                  src={item.previewUrl}
-                  alt=""
-                  className="size-full object-cover"
-                />
+                <img src={item.previewUrl} alt="" className="size-full object-cover" />
               ) : (
-                <div className="flex size-full items-center justify-center p-2 text-center text-xs font-semibold break-all text-muted">
-                  {item.fileName}
+                <div className="flex size-full flex-col items-center justify-center gap-1 p-2 text-center">
+                  <DocumentIcon />
+                  <span className="line-clamp-2 text-[11px] font-semibold break-all text-muted">
+                    {item.fileName}
+                  </span>
                 </div>
               )}
 
@@ -203,15 +229,18 @@ export function MediaUploader({
       )}
 
       {!atCapacity && (
-        <>
-          <label htmlFor={inputId} className="btn-secondary w-full cursor-pointer">
+        <div className="grid grid-cols-2 gap-2">
+          {/* Two inputs rather than one: `capture` forces the camera and hides
+              the photo library and file browser, so the browse path needs an
+              input without it. */}
+          <label htmlFor={`${inputId}-camera`} className="btn-secondary cursor-pointer">
             <CameraIcon />
-            {addLabel}
+            Take photo
           </label>
           <input
-            id={inputId}
+            id={`${inputId}-camera`}
             type="file"
-            accept={accept}
+            accept={IMAGE_TYPES}
             capture="environment"
             multiple={multiple}
             className="sr-only"
@@ -220,7 +249,23 @@ export function MediaUploader({
               event.target.value = "";
             }}
           />
-        </>
+
+          <label htmlFor={`${inputId}-browse`} className="btn-secondary cursor-pointer">
+            <UploadIcon />
+            {browseLabel}
+          </label>
+          <input
+            id={`${inputId}-browse`}
+            type="file"
+            accept={accept}
+            multiple={multiple}
+            className="sr-only"
+            onChange={(event) => {
+              void handleFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
+        </div>
       )}
     </div>
   );
@@ -240,6 +285,41 @@ function CameraIcon() {
     >
       <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2a1 1 0 0 0 .83-.45l.94-1.4A1 1 0 0 1 9.3 4.7h5.4a1 1 0 0 1 .83.45l.94 1.4A1 1 0 0 0 17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
       <circle cx="12" cy="12.8" r="3.3" />
+    </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 16V4M8 8l4-4 4 4M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" />
+    </svg>
+  );
+}
+
+function DocumentIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-7 text-muted"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 3H7.5A1.5 1.5 0 0 0 6 4.5v15A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V7z" />
+      <path d="M14 3v4h4" />
     </svg>
   );
 }

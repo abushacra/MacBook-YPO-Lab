@@ -99,20 +99,29 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
 
       {photos && photos.length > 0 && (
         <section>
-          <h2 className="section-heading mb-2">Photos</h2>
+          <h2 className="section-heading mb-2">Photos and files</h2>
           <ul className="grid grid-cols-2 gap-2">
-            {photos.map((photo) => {
-              const href = `/api/media?bucket=service-photos&path=${encodeURIComponent(photo.storage_path)}`;
+            {photos.map((attachment) => {
+              const href = `/api/media?bucket=service-photos&path=${encodeURIComponent(attachment.storage_path)}`;
+              const isPdf = attachment.storage_path.toLowerCase().endsWith(".pdf");
+
               return (
-                <li key={photo.id}>
-                  <a href={href} target="_blank" rel="noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- served via a short-lived signed URL, not optimizable */}
-                    <img
-                      src={href}
-                      alt="Service call photo"
-                      loading="lazy"
-                      className="aspect-square w-full rounded-xl border border-hairline object-cover"
-                    />
+                <li key={attachment.id}>
+                  <a href={href} target="_blank" rel="noreferrer" className="block">
+                    {isPdf ? (
+                      <span className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border border-hairline bg-white">
+                        <PdfIcon />
+                        <span className="text-xs font-semibold text-brand-700">Open PDF</span>
+                      </span>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element -- served via a short-lived signed URL, not optimizable
+                      <img
+                        src={href}
+                        alt="Service call photo"
+                        loading="lazy"
+                        className="aspect-square w-full rounded-xl border border-hairline object-cover"
+                      />
+                    )}
                   </a>
                 </li>
               );
@@ -135,6 +144,25 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
         </section>
       )}
     </div>
+  );
+}
+
+function PdfIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-10 text-muted"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 3H7.5A1.5 1.5 0 0 0 6 4.5v15A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V7z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 13.5h6M9 16.5h4" />
+    </svg>
   );
 }
 

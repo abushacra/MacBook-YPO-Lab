@@ -11,10 +11,19 @@ import { PHOTO_BUCKET, RECEIPT_BUCKET, db, isBucket } from "@/lib/supabase";
  * Actions cap request bodies at 1MB.
  */
 
-const MAX_BYTES = 8 * 1024 * 1024;
+// Vercel rejects request bodies over 4.5MB before they reach this handler;
+// the browser caps at 4MB so the failure is a message, not a dead request.
+const MAX_BYTES = 4.5 * 1024 * 1024;
 
 const ALLOWED: Record<string, readonly string[]> = {
-  [PHOTO_BUCKET]: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
+  [PHOTO_BUCKET]: [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/pdf",
+  ],
   [RECEIPT_BUCKET]: [
     "image/jpeg",
     "image/png",
@@ -51,11 +60,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No file received." }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "That file is larger than 8MB." }, { status: 413 });
+    return NextResponse.json({ error: "That file is larger than 4MB." }, { status: 413 });
   }
   if (!ALLOWED[bucket].includes(file.type)) {
     return NextResponse.json(
-      { error: "Use a photo (JPG, PNG, HEIC) or a PDF receipt." },
+      { error: "Use a photo (JPG, PNG, HEIC) or a PDF." },
       { status: 415 },
     );
   }

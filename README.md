@@ -66,7 +66,7 @@ the database, so deactivating someone takes effect immediately.
 
 **Service call** — date, regular or after hours, emergency or scheduled, and
 property are required. Space, a description of the work, a follow-up flag with
-notes, and up to eight photos are optional.
+notes, and up to eight photos or PDFs are optional.
 
 Space can be tapped from the property's list, typed free-hand, or left blank
 for whole-property work. A typed value that matches a managed space (ignoring
@@ -77,9 +77,14 @@ record; anything else is stored as a one-off label.
 A receipt image or PDF, store, category, notes, and a link to a related service
 call are optional.
 
-Photos and receipts upload the moment they are picked, while the engineer is
-still filling in the rest of the form, and images are downscaled to 1600px in
-the browser first so they move on a weak cellular connection.
+Attachments offer two buttons: **Take photo** opens the camera straight away,
+and **Choose file** opens the phone's photo library and file browser, so a shot
+taken earlier or a PDF that arrived by email can be attached just as easily.
+
+They upload the moment they are picked, while the engineer is still filling in
+the rest of the form. Images are downscaled to 1600px in the browser first so
+they move on a weak cellular connection; PDFs are sent as-is and are capped at
+4MB, which is the largest body the hosting platform accepts.
 
 ## On a phone
 
@@ -105,7 +110,7 @@ global sign-out if a phone is lost.
 | `spaces` | Units, suites, and common areas within a property. Suggestions, not a closed list. |
 | `technicians` | In-house engineers and outside vendors, with PIN hash and admin flag. |
 | `service_calls` | One row per logged call. |
-| `service_call_photos` | Storage paths of the photos on a call. |
+| `service_call_photos` | Storage paths of the photos and PDFs attached to a call. |
 | `expenses` | Credit card charges, each assigned to a property. |
 
 Service calls and expenses store a `property_label` / `space_label` snapshot

@@ -80,11 +80,14 @@ export function ExpenseForm({
         </select>
       </Field>
 
-      <Field label="Photo of the receipt">
+      <Field
+        label="Receipt"
+        hint="Snap it, or pick a photo or PDF already on your phone."
+      >
         <MediaUploader
           name="receipt"
           bucket="receipts"
-          addLabel="Add receipt"
+          browseLabel="Choose file"
           accept="image/*,application/pdf"
           onBusyChange={setUploading}
         />
