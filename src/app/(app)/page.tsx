@@ -10,7 +10,12 @@ export const metadata = { title: "Home · Kapa Service Log" };
 export default async function HomePage() {
   const user = await requireUser();
 
-  const [{ data: recent }, { data: followUps }] = await Promise.all([
+  const pendingQuery = db()
+    .from("service_calls")
+    .select("id", { count: "exact", head: true })
+    .eq("approval_status", "pending");
+
+  const [{ data: recent }, { data: followUps }, { count: pendingCount }] = await Promise.all([
     db()
       .from("service_calls")
       .select("id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, follow_up_needed")
@@ -24,6 +29,7 @@ export default async function HomePage() {
       .eq("follow_up_needed", true)
       .order("call_date", { ascending: false })
       .limit(5),
+    user.is_admin ? pendingQuery : pendingQuery.eq("routed_to_chief_id", user.id),
   ]);
 
   return (
@@ -36,6 +42,23 @@ export default async function HomePage() {
           Log a credit card receipt
         </Link>
       </section>
+
+      {(user.is_chief || user.is_admin) && (pendingCount ?? 0) > 0 && (
+        <Link
+          href="/calls?scope=to_approve"
+          className="card flex items-center justify-between gap-3 border-amber-300 bg-amber-50 px-4 py-4 active:bg-amber-100"
+        >
+          <span>
+            <span className="block text-base font-bold text-amber-900">
+              {pendingCount} service call{pendingCount === 1 ? "" : "s"} awaiting your approval
+            </span>
+            <span className="block text-sm text-amber-800">Tap to review them.</span>
+          </span>
+          <span aria-hidden="true" className="text-xl font-bold text-amber-900">
+            &rsaquo;
+          </span>
+        </Link>
+      )}
 
       {followUps && followUps.length > 0 && (
         <section>

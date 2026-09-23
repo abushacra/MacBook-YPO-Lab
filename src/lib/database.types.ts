@@ -146,6 +146,11 @@ export type Database = {
           id: string
           property_id: string
           property_label: string
+          approval_status: string
+          routed_to_chief_id: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          review_note: string | null
           property_id_2: string | null
           property_label_2: string | null
           space_id_2: string | null
@@ -169,6 +174,11 @@ export type Database = {
           id?: string
           property_id: string
           property_label: string
+          approval_status?: string
+          routed_to_chief_id?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_note?: string | null
           property_id_2?: string | null
           property_label_2?: string | null
           space_id_2?: string | null
@@ -192,6 +202,11 @@ export type Database = {
           id?: string
           property_id?: string
           property_label?: string
+          approval_status?: string
+          routed_to_chief_id?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_note?: string | null
           property_id_2?: string | null
           property_label_2?: string | null
           space_id_2?: string | null
@@ -306,6 +321,8 @@ export type Database = {
           failed_pin_attempts: number
           id: string
           is_admin: boolean
+          is_chief: boolean
+          chief_id: string | null
           kind: string
           locked_until: string | null
           name: string
@@ -318,6 +335,8 @@ export type Database = {
           failed_pin_attempts?: number
           id?: string
           is_admin?: boolean
+          is_chief?: boolean
+          chief_id?: string | null
           kind?: string
           locked_until?: string | null
           name: string
@@ -330,6 +349,8 @@ export type Database = {
           failed_pin_attempts?: number
           id?: string
           is_admin?: boolean
+          is_chief?: boolean
+          chief_id?: string | null
           kind?: string
           locked_until?: string | null
           name?: string

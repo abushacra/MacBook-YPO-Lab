@@ -8,7 +8,7 @@ import type { Tables } from "@/lib/database.types";
 
 export type CurrentUser = Pick<
   Tables<"technicians">,
-  "id" | "name" | "company" | "kind" | "is_admin"
+  "id" | "name" | "company" | "kind" | "is_admin" | "is_chief" | "chief_id"
 >;
 
 /**
@@ -22,7 +22,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const { data } = await db()
     .from("technicians")
-    .select("id, name, company, kind, is_admin, active")
+    .select("id, name, company, kind, is_admin, is_chief, chief_id, active")
     .eq("id", session.sub)
     .maybeSingle();
 
@@ -34,6 +34,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     company: data.company,
     kind: data.kind,
     is_admin: data.is_admin,
+    is_chief: data.is_chief,
+    chief_id: data.chief_id,
   };
 }
 

@@ -48,6 +48,30 @@ From there, open **Admin → People** to add the real engineers and vendors, and
 **Admin → Properties** to replace the three sample properties with Kapa's
 portfolio. Once a real administrator exists, deactivate `Kapa Admin`.
 
+## Approvals
+
+An in-house engineer can be tagged **Chief Engineer** in Admin → People. Other
+engineers and outside vendors are then placed under one chief with the
+**Reports to** picker.
+
+Every service call is saved as **Awaiting approval** and routed to the logger's
+chief. The chief sees a card on the Home screen with the count, and a
+**To approve** filter on the Calls screen. Opening a call gives them Approve or
+Send back, with an optional note that the engineer sees on the call.
+
+Rules the app holds to:
+
+- Only the chief a call was routed to, or an admin, can review it.
+- Nobody approves their own work, including a chief and an admin.
+- Routing is snapshotted when the call is saved, so moving someone to a new
+  chief never pulls work out of the old chief's queue.
+- Calls logged by someone with no chief stay pending and are visible to admins,
+  who can approve them.
+
+The database enforces the structure independently: only in-house engineers can
+be chiefs, a reporting line must point at an actual chief, nobody reports to
+themselves, and a chief cannot be untagged while people still report to them.
+
 ## Paying engineers
 
 Each in-house engineer has rate tiers set in **Admin → People**: three named by
@@ -135,9 +159,9 @@ global sign-out if a phone is lost.
 | --- | --- |
 | `properties` | The portfolio. Retired instead of deleted, so old logs still resolve. |
 | `spaces` | Units, suites, and common areas within a property. Suggestions, not a closed list. |
-| `technicians` | In-house engineers and outside vendors, with PIN hash and admin flag. |
+| `technicians` | In-house engineers and outside vendors, with PIN hash, admin and chief flags, and who they report to. |
 | `technician_rates` | Per-engineer billing tiers. Exactly one is the active rate. |
-| `service_calls` | One row per logged call, covering one or two properties. |
+| `service_calls` | One row per logged call, covering one or two properties, with its approval state. |
 | `service_call_photos` | Storage paths of the photos and PDFs attached to a call. |
 | `expenses` | Credit card charges, each assigned to a property. |
 

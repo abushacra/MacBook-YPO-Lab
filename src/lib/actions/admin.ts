@@ -144,6 +144,9 @@ export async function addTechnician(_prev: FormState, formData: FormData): Promi
       kind: parsed.data.kind,
       company: optionalText(formData, "company"),
       is_admin: checkbox(formData, "is_admin"),
+      // Only in-house engineers can be chiefs; the database enforces this too.
+      is_chief: parsed.data.kind === "in_house" && checkbox(formData, "is_chief"),
+      chief_id: chiefIdFrom(formData),
     })
     .select("id")
     .single();
@@ -153,7 +156,9 @@ export async function addTechnician(_prev: FormState, formData: FormData): Promi
       error:
         error?.code === "23505"
           ? "Someone with that name is already on the list."
-          : "Could not add the person.",
+          : error?.message?.includes("chief")
+            ? "Pick a chief engineer from the list, or leave it blank."
+            : "Could not add the person.",
     };
   }
 
@@ -199,6 +204,46 @@ export async function setSpaceActive(formData: FormData): Promise<void> {
     .from("spaces")
     .update({ active: text(formData, "active") === "true" })
     .eq("id", id);
+  refreshAdminViews();
+}
+
+/** Reads an optional "reports to" selection. */
+function chiefIdFrom(formData: FormData): string | null {
+  const value = text(formData, "chief_id");
+  return value && z.uuid().safeParse(value).success ? value : null;
+}
+
+/**
+ * Tags or untags someone as a chief engineer. The database refuses to untag a
+ * chief who still has people reporting to them, which surfaces here as a
+ * no-op rather than orphaning a team.
+ */
+export async function setTechnicianChief(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = idFrom(formData);
+  if (!id) return;
+
+  const { error } = await db()
+    .from("technicians")
+    .update({ is_chief: text(formData, "is_chief") === "true" })
+    .eq("id", id);
+
+  if (!error) {
+    refreshAdminViews();
+    revalidatePath("/calls");
+  }
+}
+
+/** Puts someone under a chief engineer, or clears their reporting line. */
+export async function assignChief(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = idFrom(formData);
+  if (!id) return;
+
+  const chiefId = chiefIdFrom(formData);
+  if (chiefId === id) return;
+
+  await db().from("technicians").update({ chief_id: chiefId }).eq("id", id);
   refreshAdminViews();
 }
 

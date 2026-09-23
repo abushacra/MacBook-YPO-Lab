@@ -6,6 +6,7 @@ import {
   deleteProperty,
   deleteSpace,
   resetTechnicianPin,
+  setTechnicianChief,
   setPropertyActive,
   setSpaceActive,
   setTechnicianActive,
@@ -20,6 +21,7 @@ import {
   TechnicianRatesForm,
 } from "@/components/admin-forms";
 import { ConfirmButton } from "@/components/confirm-button";
+import { ChiefSelect } from "@/components/chief-select";
 
 export const metadata = { title: "Admin · Kapa Service Log" };
 
@@ -212,7 +214,7 @@ async function loadPeople() {
   const [{ data }, { data: rates }] = await Promise.all([
     db()
       .from("technicians")
-      .select("id, name, company, kind, is_admin, active, pin_hash, locked_until")
+      .select("id, name, company, kind, is_admin, is_chief, chief_id, active, pin_hash, locked_until")
       .order("name"),
     db()
       .from("technician_rates")
@@ -236,12 +238,17 @@ async function loadPeople() {
 
 async function PeopleTab({ adminId }: { adminId: string }) {
   const people = await loadPeople();
+  const chiefs = people
+    .filter((person) => person.is_chief && person.active)
+    .map((person) => ({ id: person.id, name: person.name }));
+  const teamSize = (chiefId: string) =>
+    people.filter((person) => person.chief_id === chiefId).length;
 
   return (
     <div className="space-y-6">
       <section>
         <h2 className="section-heading mb-2">Add a person</h2>
-        <AddTechnicianForm />
+        <AddTechnicianForm chiefs={chiefs} />
       </section>
 
       <section>
@@ -267,6 +274,11 @@ async function PeopleTab({ adminId }: { adminId: string }) {
                 </div>
 
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  {person.is_chief && (
+                    <span className="chip bg-emerald-100 text-emerald-800">
+                      Chief Engineer · {countLabel(teamSize(person.id), "report")}
+                    </span>
+                  )}
                   {person.is_admin && <span className="chip bg-brand-100 text-brand-800">Admin</span>}
                   {!person.active && <span className="chip bg-slate-200 text-slate-700">Inactive</span>}
                   {!person.pin_hash && <span className="chip bg-amber-100 text-amber-900">PIN not set</span>}
@@ -306,6 +318,20 @@ async function PeopleTab({ adminId }: { adminId: string }) {
 
                   {!isSelf && (
                     <>
+                      {person.kind === "in_house" && (
+                        <form action={setTechnicianChief}>
+                          <input type="hidden" name="id" value={person.id} />
+                          <input
+                            type="hidden"
+                            name="is_chief"
+                            value={person.is_chief ? "false" : "true"}
+                          />
+                          <button type="submit" className="btn-secondary min-h-10 px-3 text-sm">
+                            {person.is_chief ? "Remove chief" : "Make chief"}
+                          </button>
+                        </form>
+                      )}
+
                       <form action={setTechnicianAdmin}>
                         <input type="hidden" name="id" value={person.id} />
                         <input type="hidden" name="is_admin" value={person.is_admin ? "false" : "true"} />
@@ -327,6 +353,25 @@ async function PeopleTab({ adminId }: { adminId: string }) {
                     </>
                   )}
                 </div>
+
+                {!person.is_chief && chiefs.length > 0 && (
+                  <ChiefSelect
+                    technicianId={person.id}
+                    chiefId={person.chief_id}
+                    chiefs={chiefs.filter((chief) => chief.id !== person.id)}
+                  />
+                )}
+
+                {person.is_chief && teamSize(person.id) > 0 && (
+                  <p className="mt-2 text-xs text-muted">
+                    Approves calls from{" "}
+                    {people
+                      .filter((member) => member.chief_id === person.id)
+                      .map((member) => member.name)
+                      .join(", ")}
+                    .
+                  </p>
+                )}
 
                 {person.kind === "in_house" && (
                   <details className="mt-3">

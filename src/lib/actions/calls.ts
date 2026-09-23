@@ -181,6 +181,9 @@ export async function createServiceCall(
       rate_id: rateId,
       billed_label: billedLabel,
       billed_amount: billedAmount,
+      // Snapshotted so moving someone to a new chief later never pulls work
+      // out of the old chief's queue.
+      routed_to_chief_id: user.chief_id,
       description: optionalText(formData, "description"),
       follow_up_needed: followUpNeeded,
       follow_up_notes: followUpNeeded ? optionalText(formData, "follow_up_notes") : null,
@@ -211,6 +214,48 @@ export async function setFollowUpResolved(formData: FormData): Promise<void> {
   if (!z.uuid().safeParse(id).success) return;
 
   await db().from("service_calls").update({ follow_up_needed: false }).eq("id", id);
+
+  revalidatePath("/");
+  revalidatePath("/calls");
+  revalidatePath(`/calls/${id}`);
+}
+
+/**
+ * A chief approves or sends back a call from their team. Admins can act on any
+ * call, which keeps things moving when a chief is away or when the engineer
+ * has no chief assigned yet.
+ */
+export async function reviewServiceCall(formData: FormData): Promise<void> {
+  const user = await requireUser();
+
+  const id = text(formData, "id");
+  const decision = text(formData, "decision");
+  if (!z.uuid().safeParse(id).success) return;
+  if (decision !== "approved" && decision !== "rejected") return;
+
+  const { data: call } = await db()
+    .from("service_calls")
+    .select("id, technician_id, routed_to_chief_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!call) return;
+
+  // Approving your own work is not a review.
+  if (call.technician_id === user.id) return;
+
+  const isRoutedChief = user.is_chief && call.routed_to_chief_id === user.id;
+  if (!isRoutedChief && !user.is_admin) return;
+
+  await db()
+    .from("service_calls")
+    .update({
+      approval_status: decision,
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+      review_note: optionalText(formData, "review_note"),
+    })
+    .eq("id", id);
 
   revalidatePath("/");
   revalidatePath("/calls");

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { formatDate, formatLocation, formatMoney, isUuid } from "@/lib/format";
-import { CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
+import { ApprovalBadge, CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
 import { PropertyFilter } from "@/components/property-filter";
 
 export const metadata = { title: "Service calls · Kapa Service Log" };
@@ -23,7 +23,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   let query = db()
     .from("service_calls")
     .select(
-      "id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, description, follow_up_needed, technician_id, billed_amount",
+      "id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, description, follow_up_needed, technician_id, billed_amount, approval_status, routed_to_chief_id",
     )
     .order("call_date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -31,6 +31,12 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
 
   if (scope === "mine") query = query.eq("technician_id", user.id);
   if (scope === "follow_up") query = query.eq("follow_up_needed", true);
+
+  // A chief sees only what was routed to them; an admin sees every open one.
+  if (scope === "to_approve") {
+    query = query.eq("approval_status", "pending");
+    if (!user.is_admin) query = query.eq("routed_to_chief_id", user.id);
+  }
   // A call can name two properties, so the filter has to match either.
   // The id goes into a raw PostgREST filter string, so it is checked first.
   if (propertyId && isUuid(propertyId)) {
@@ -59,10 +65,12 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
     0,
   );
 
+  const canReview = user.is_chief || user.is_admin;
   const scopes = [
     { value: "all", label: "All" },
     { value: "mine", label: "Mine" },
     { value: "follow_up", label: "Follow-ups" },
+    ...(canReview ? [{ value: "to_approve", label: "To approve" }] : []),
   ];
 
   const hrefFor = (nextScope: string) => {
@@ -146,6 +154,9 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                   <CallTypeBadge value={call.call_type} />
                   <HoursBadge value={call.hours_type} />
                   {call.follow_up_needed && <FollowUpBadge />}
+                  {call.approval_status !== "approved" && (
+                    <ApprovalBadge value={call.approval_status} />
+                  )}
                   <span className="ml-auto text-xs text-muted">
                     {call.technician_id === user.id
                       ? "You"

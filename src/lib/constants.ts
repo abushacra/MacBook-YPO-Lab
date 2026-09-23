@@ -51,3 +51,12 @@ export const DEFAULT_RATE_TIERS = [
 
 /** How many rate rows the admin screens show per engineer: three plus a custom. */
 export const RATE_SLOTS = DEFAULT_RATE_TIERS.length + 1;
+
+export const APPROVAL_STATUSES = ["pending", "approved", "rejected"] as const;
+export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+
+export const APPROVAL_LABELS: Record<ApprovalStatus, string> = {
+  pending: "Awaiting approval",
+  approved: "Approved",
+  rejected: "Sent back",
+};

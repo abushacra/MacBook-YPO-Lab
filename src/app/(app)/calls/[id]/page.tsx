@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { setFollowUpResolved } from "@/lib/actions/calls";
+import { reviewServiceCall, setFollowUpResolved } from "@/lib/actions/calls";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
-import { CallTypeBadge, HoursBadge } from "@/components/call-badges";
+import { ApprovalBadge, CallTypeBadge, HoursBadge } from "@/components/call-badges";
 import { SubmitButton } from "@/components/submit-button";
 
 export const metadata = { title: "Service call · Kapa Service Log" };
@@ -40,6 +40,16 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
       .eq("service_call_id", call.id),
   ]);
 
+  const { data: reviewer } = call.reviewed_by
+    ? await db().from("technicians").select("name").eq("id", call.reviewed_by).maybeSingle()
+    : { data: null };
+
+  // Reviewing your own work is never allowed, so the panel does not appear.
+  const canReview =
+    call.approval_status === "pending" &&
+    call.technician_id !== user.id &&
+    ((user.is_chief && call.routed_to_chief_id === user.id) || user.is_admin);
+
   return (
     <div className="space-y-5">
       {justSaved && (
@@ -72,7 +82,43 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
       <div className="flex flex-wrap gap-1.5">
         <CallTypeBadge value={call.call_type} />
         <HoursBadge value={call.hours_type} />
+        <ApprovalBadge value={call.approval_status} />
       </div>
+
+      {call.approval_status !== "pending" && (
+        <p className="text-sm text-muted">
+          {call.approval_status === "approved" ? "Approved" : "Sent back"} by{" "}
+          <span className="font-semibold text-ink">{reviewer?.name ?? "a reviewer"}</span>
+          {call.reviewed_at ? ` on ${formatDateTime(call.reviewed_at)}` : ""}.
+          {call.review_note ? ` "${call.review_note}"` : ""}
+        </p>
+      )}
+
+      {canReview && (
+        <form action={reviewServiceCall} className="card space-y-3 p-4">
+          <input type="hidden" name="id" value={call.id} />
+          <p className="font-semibold">Your approval</p>
+          <textarea
+            name="review_note"
+            rows={2}
+            placeholder="Optional note — required reading if you send it back."
+            className="textarea"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="submit"
+              name="decision"
+              value="approved"
+              className="btn bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Approve
+            </button>
+            <button type="submit" name="decision" value="rejected" className="btn-danger">
+              Send back
+            </button>
+          </div>
+        </form>
+      )}
 
       <dl className="card divide-y divide-hairline text-sm">
         <Row label="Date" value={formatDate(call.call_date)} />

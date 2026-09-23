@@ -64,9 +64,10 @@ export function AddSpaceForm({ properties }: { properties: { id: string; name: s
   );
 }
 
-export function AddTechnicianForm() {
+export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: string }[] }) {
   const { state, formAction, formRef } = useResettingAction(addTechnician);
   const [kind, setKind] = useState<string>("in_house");
+  const [isChief, setIsChief] = useState(false);
 
   return (
     <form ref={formRef} action={formAction} className="card space-y-4 p-4">
@@ -99,6 +100,38 @@ export function AddTechnicianForm() {
         <input type="checkbox" name="is_admin" className="size-6 shrink-0 rounded accent-brand-600" />
         <span className="text-base font-semibold">Can manage properties and people</span>
       </label>
+
+      {kind === "in_house" && (
+        <label className="flex min-h-13 cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            name="is_chief"
+            checked={isChief}
+            onChange={(event) => setIsChief(event.target.checked)}
+            className="size-6 shrink-0 rounded accent-brand-600"
+          />
+          <span className="text-base font-semibold">
+            Chief Engineer — approves their team&apos;s service calls
+          </span>
+        </label>
+      )}
+
+      {!isChief && chiefs.length > 0 && (
+        <Field
+          label="Reports to"
+          htmlFor="new-tech-chief"
+          hint="Their service calls go to this chief for approval."
+        >
+          <select id="new-tech-chief" name="chief_id" defaultValue="" className="input">
+            <option value="">No chief yet</option>
+            {chiefs.map((chief) => (
+              <option key={chief.id} value={chief.id}>
+                {chief.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       {kind === "in_house" ? (
         <div>
