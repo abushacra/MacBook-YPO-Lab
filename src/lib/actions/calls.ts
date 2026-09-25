@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/auth";
-import { db } from "@/lib/supabase";
+import { requireAdmin, requireUser } from "@/lib/auth";
+import { PHOTO_BUCKET, db } from "@/lib/supabase";
 import { CALL_TYPES, HOURS_TYPES } from "@/lib/constants";
 import {
   type FormState,
@@ -241,10 +241,11 @@ export async function reviewServiceCall(formData: FormData): Promise<void> {
 
   if (!call) return;
 
-  // Approving your own work is not a review.
-  if (call.technician_id === user.id) return;
-
-  const isRoutedChief = user.is_chief && call.routed_to_chief_id === user.id;
+  // Admins can sign off anything, including shifts they logged themselves —
+  // they are the backstop for shifts whose author has no chief. A chief is
+  // still held to the separation: their own shifts go to their own chief.
+  const isRoutedChief =
+    user.is_chief && call.routed_to_chief_id === user.id && call.technician_id !== user.id;
   if (!isRoutedChief && !user.is_admin) return;
 
   await db()
@@ -260,4 +261,38 @@ export async function reviewServiceCall(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/calls");
   revalidatePath(`/calls/${id}`);
+}
+
+/**
+ * Removes a maintenance shift outright, admin only.
+ *
+ * The shift's photo and PDF rows cascade with it, and their files are taken out
+ * of storage here — Supabase refuses storage deletes from SQL, so the Storage
+ * API is the only thing that clears them. A receipt logged against the shift is
+ * kept and simply unlinked: that is a financial record assigned to a property,
+ * and it should not disappear because the shift it referenced did.
+ */
+export async function deleteServiceCall(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const id = text(formData, "id");
+  if (!z.uuid().safeParse(id).success) return;
+
+  const { data: attachments } = await db()
+    .from("service_call_photos")
+    .select("storage_path")
+    .eq("service_call_id", id);
+
+  const paths = (attachments ?? []).map((row) => row.storage_path);
+  if (paths.length > 0) {
+    await db().storage.from(PHOTO_BUCKET).remove(paths);
+  }
+
+  const { error } = await db().from("service_calls").delete().eq("id", id);
+  if (error) return;
+
+  revalidatePath("/");
+  revalidatePath("/calls");
+  revalidatePath("/expenses");
+  redirect("/calls?deleted=1");
 }

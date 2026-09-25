@@ -19,6 +19,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   const params = await searchParams;
   const scope = one(params.scope) || "all";
   const propertyId = one(params.property);
+  const justDeleted = one(params.deleted) === "1";
 
   let query = db()
     .from("service_calls")
@@ -83,6 +84,15 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
 
   return (
     <div className="space-y-4">
+      {justDeleted && (
+        <p
+          role="status"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
+        >
+          Shift deleted.
+        </p>
+      )}
+
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold">Maintenance shifts</h1>
         <Link href="/calls/new" className="btn-primary min-h-11 px-4 text-sm">

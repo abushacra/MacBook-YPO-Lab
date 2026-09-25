@@ -62,7 +62,10 @@ Send back, with an optional note that the engineer sees on the call.
 Rules the app holds to:
 
 - Only the chief a shift was routed to, or an admin, can review it.
-- Nobody approves their own work, including a chief and an admin.
+- A chief cannot approve their own work; their shifts go to their own chief.
+- An admin can sign off anything, including shifts they logged themselves, and
+  can revise a decision already made. That is deliberate: an admin is the
+  backstop for shifts whose author has no chief, and for a correction.
 - Routing is snapshotted when the call is saved, so moving someone to a new
   chief never pulls work out of the old chief's queue.
 - Shifts logged by someone with no chief stay pending and are visible to admins,
@@ -71,6 +74,17 @@ Rules the app holds to:
 The database enforces the structure independently: only in-house engineers can
 be chiefs, a reporting line must point at an actual chief, nobody reports to
 themselves, and a chief cannot be untagged while people still report to them.
+
+### Deleting a shift
+
+An admin gets a **Delete shift** control at the bottom of any shift, behind a
+two-tap confirmation. It removes the shift and its photo and PDF rows, and
+clears those files out of storage through the Storage API — SQL cannot delete
+storage objects, so this is the only path that leaves nothing behind.
+
+A receipt logged against the shift is **kept and unlinked**, not deleted. It is
+a financial record assigned to a property and should not disappear because the
+shift it referenced did.
 
 ## Paying engineers
 

@@ -3,10 +3,15 @@ import { notFound } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { reviewServiceCall, setFollowUpResolved } from "@/lib/actions/calls";
+import {
+  deleteServiceCall,
+  reviewServiceCall,
+  setFollowUpResolved,
+} from "@/lib/actions/calls";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { ApprovalBadge, CallTypeBadge, HoursBadge } from "@/components/call-badges";
 import { SubmitButton } from "@/components/submit-button";
+import { ConfirmButton } from "@/components/confirm-button";
 
 export const metadata = { title: "Maintenance shift · Kapa Service Log" };
 
@@ -44,11 +49,17 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
     ? await db().from("technicians").select("name").eq("id", call.reviewed_by).maybeSingle()
     : { data: null };
 
-  // Reviewing your own work is never allowed, so the panel does not appear.
+  /*
+   * Admins can sign off anything and revise a decision already made, which is
+   * what makes them the backstop for shifts with no chief. A chief only sees
+   * the panel for a pending shift routed to them that is not their own.
+   */
   const canReview =
-    call.approval_status === "pending" &&
-    call.technician_id !== user.id &&
-    ((user.is_chief && call.routed_to_chief_id === user.id) || user.is_admin);
+    user.is_admin ||
+    (call.approval_status === "pending" &&
+      user.is_chief &&
+      call.routed_to_chief_id === user.id &&
+      call.technician_id !== user.id);
 
   return (
     <div className="space-y-5">
@@ -97,7 +108,14 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
       {canReview && (
         <form action={reviewServiceCall} className="card space-y-3 p-4">
           <input type="hidden" name="id" value={call.id} />
-          <p className="font-semibold">Your approval</p>
+          <p className="font-semibold">
+            {call.approval_status === "pending" ? "Your approval" : "Change this decision"}
+          </p>
+          {call.technician_id === user.id && (
+            <p className="text-xs text-muted">
+              This is your own shift. You can sign it off because you are an admin.
+            </p>
+          )}
           <textarea
             name="review_note"
             rows={2}
@@ -191,6 +209,26 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
               );
             })}
           </ul>
+        </section>
+      )}
+
+      {user.is_admin && (
+        <section className="rounded-2xl border border-red-200 bg-red-50 p-4">
+          <h2 className="text-sm font-bold text-red-900">Delete this shift</h2>
+          <p className="mt-1 text-xs text-red-800">
+            Removes the shift and its photos and files for good. A receipt logged
+            against it is kept and simply unlinked.
+          </p>
+          <form action={deleteServiceCall} className="mt-3">
+            <input type="hidden" name="id" value={call.id} />
+            <ConfirmButton
+              confirmLabel="Tap again to delete this shift"
+              className="btn-danger w-full"
+              confirmClassName="btn w-full bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete shift
+            </ConfirmButton>
+          </form>
         </section>
       )}
 
