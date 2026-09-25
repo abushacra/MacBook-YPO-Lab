@@ -20,7 +20,7 @@ const MAX_SPACE_LENGTH = 120;
 
 const schema = z.object({
   call_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date of the call."),
-  hours_type: z.enum(HOURS_TYPES, { message: "Choose Regular or OT Rate." }),
+  hours_type: z.enum(HOURS_TYPES, { message: "Choose a Shift Charge." }),
   call_type: z.enum(CALL_TYPES, { message: "Choose emergency or scheduled." }),
   property_id: z.uuid("Choose a property."),
   space: z.string().max(MAX_SPACE_LENGTH, "That space name is too long."),
@@ -192,7 +192,7 @@ export async function createServiceCall(
     .single();
 
   if (error || !created) {
-    return { error: "Could not save the service call. Check your signal and try again." };
+    return { error: "Could not save the maintenance shift. Check your signal and try again." };
   }
 
   const photos = storagePaths(formData, "photos");

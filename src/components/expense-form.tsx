@@ -115,9 +115,9 @@ export function ExpenseForm({
       </Field>
 
       {recentCalls.length > 0 && (
-        <Field label="Related service call" htmlFor="service_call_id">
+        <Field label="Related maintenance shift" htmlFor="service_call_id">
           <select id="service_call_id" name="service_call_id" defaultValue="" className="input">
-            <option value="">Not tied to a call</option>
+            <option value="">Not tied to a shift</option>
             {recentCalls.map((call) => (
               <option key={call.id} value={call.id}>
                 {call.label}

@@ -8,7 +8,7 @@ import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { ApprovalBadge, CallTypeBadge, HoursBadge } from "@/components/call-badges";
 import { SubmitButton } from "@/components/submit-button";
 
-export const metadata = { title: "Service call · Kapa Service Log" };
+export const metadata = { title: "Maintenance shift · Kapa Service Log" };
 
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -57,13 +57,13 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
           role="status"
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
         >
-          Service call saved.
+          Maintenance shift saved.
         </p>
       )}
 
       <div>
         <Link href="/calls" className="text-sm font-semibold text-brand-700">
-          ← All calls
+          ← All shifts
         </Link>
         <h1 className="mt-2 text-xl font-bold">{call.property_label}</h1>
         {call.space_label && <p className="text-base text-muted">{call.space_label}</p>}
@@ -181,7 +181,7 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
                       // eslint-disable-next-line @next/next/no-img-element -- served via a short-lived signed URL, not optimizable
                       <img
                         src={href}
-                        alt="Service call photo"
+                        alt="Maintenance shift photo"
                         loading="lazy"
                         className="aspect-square w-full rounded-xl border border-hairline object-cover"
                       />
@@ -196,7 +196,7 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
 
       {expenses && expenses.length > 0 && (
         <section>
-          <h2 className="section-heading mb-2">Charges on this call</h2>
+          <h2 className="section-heading mb-2">Charges on this shift</h2>
           <ul className="card divide-y divide-hairline">
             {expenses.map((expense) => (
               <li key={expense.id} className="flex items-center justify-between gap-3 px-4 py-3">

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Kapa Service Log",
     short_name: "Kapa Log",
-    description: "Log service calls and credit card receipts from the field.",
+    description: "Log maintenance shifts and credit card receipts from the field.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

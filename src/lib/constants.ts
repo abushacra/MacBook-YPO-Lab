@@ -1,4 +1,4 @@
-export const HOURS_TYPES = ["regular", "after_hours"] as const;
+export const HOURS_TYPES = ["regular", "after_hours", "double_time"] as const;
 export const CALL_TYPES = ["emergency", "scheduled"] as const;
 export const TECHNICIAN_KINDS = ["in_house", "vendor"] as const;
 
@@ -7,13 +7,14 @@ export type CallType = (typeof CALL_TYPES)[number];
 export type TechnicianKind = (typeof TECHNICIAN_KINDS)[number];
 
 /**
- * Display text for the Service Time field. The stored values stay `regular`
- * and `after_hours` — renaming them would mean rewriting calls already
- * logged, and "after hours" is precisely when the OT rate applies.
+ * Display text for the Shift Charge field. The stored values keep their
+ * original spelling — renaming them would mean rewriting shifts already
+ * logged — so `after_hours` is the x 1.5 tier.
  */
 export const HOURS_TYPE_LABELS: Record<HoursType, string> = {
   regular: "Regular",
-  after_hours: "OT Rate",
+  after_hours: "x 1.5 Shift",
+  double_time: "x 2 Shift",
 };
 
 export const CALL_TYPE_LABELS: Record<CallType, string> = {

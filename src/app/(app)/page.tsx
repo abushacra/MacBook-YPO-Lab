@@ -36,7 +36,7 @@ export default async function HomePage() {
     <div className="space-y-7">
       <section className="space-y-3">
         <Link href="/calls/new" className="btn-primary w-full py-4 text-lg">
-          Log a service call
+          Log a maintenance shift
         </Link>
         <Link href="/expenses/new" className="btn-secondary w-full py-4 text-lg">
           Log a credit card receipt
@@ -50,7 +50,7 @@ export default async function HomePage() {
         >
           <span>
             <span className="block text-base font-bold text-amber-900">
-              {pendingCount} service call{pendingCount === 1 ? "" : "s"} awaiting your approval
+              {pendingCount} maintenance shift{pendingCount === 1 ? "" : "s"} awaiting your approval
             </span>
             <span className="block text-sm text-amber-800">Tap to review them.</span>
           </span>
@@ -80,7 +80,7 @@ export default async function HomePage() {
 
       <section>
         <div className="mb-2 flex items-baseline justify-between px-1">
-          <h2 className="section-heading">Your recent calls</h2>
+          <h2 className="section-heading">Your recent shifts</h2>
           <Link href="/calls" className="text-sm font-semibold text-brand-700">
             See all
           </Link>
@@ -117,7 +117,7 @@ export default async function HomePage() {
           </ul>
         ) : (
           <p className="card px-4 py-6 text-center text-sm text-muted">
-            Nothing logged yet. Your calls will show up here.
+            Nothing logged yet. Your shifts will show up here.
           </p>
         )}
       </section>

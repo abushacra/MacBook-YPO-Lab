@@ -61,18 +61,19 @@ export function ServiceCallForm({
         />
       </Field>
 
-      <Field label="Service Time" required error={errors.hours_type}>
+      <Field label="Shift Charge" required error={errors.hours_type}>
         <Segmented
           name="hours_type"
           defaultValue="regular"
           options={[
             { value: "regular", label: "Regular" },
-            { value: "after_hours", label: "OT Rate", tone: "amber" },
+            { value: "after_hours", label: "x 1.5 Shift", tone: "amber" },
+            { value: "double_time", label: "x 2 Shift", tone: "danger" },
           ]}
         />
       </Field>
 
-      <Field label="Call type" required error={errors.call_type}>
+      <Field label="Shift type" required error={errors.call_type}>
         <Segmented
           name="call_type"
           defaultValue="scheduled"
@@ -105,7 +106,7 @@ export function ServiceCallForm({
             className="size-6 shrink-0 rounded accent-brand-600"
           />
           <span className="text-base font-semibold">
-            This call covers a second property
+            This shift covers a second property
           </span>
         </label>
 
@@ -204,8 +205,8 @@ export function ServiceCallForm({
         className="sticky z-20 -mx-4 border-t border-hairline bg-canvas/95 px-4 pt-3 pb-3 backdrop-blur"
         style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))" }}
       >
-        <SubmitButton pendingLabel="Saving call…" disabled={uploading}>
-          {uploading ? "Waiting for photos…" : "Save service call"}
+        <SubmitButton pendingLabel="Saving shift…" disabled={uploading}>
+          {uploading ? "Waiting for photos…" : "Save maintenance shift"}
         </SubmitButton>
       </div>
     </form>

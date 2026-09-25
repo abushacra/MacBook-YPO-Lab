@@ -6,7 +6,7 @@ import { formatDate, formatLocation, formatMoney, isUuid } from "@/lib/format";
 import { ApprovalBadge, CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
 import { PropertyFilter } from "@/components/property-filter";
 
-export const metadata = { title: "Service calls · Kapa Service Log" };
+export const metadata = { title: "Maintenance shifts · Kapa Service Log" };
 
 const PAGE_SIZE = 50;
 
@@ -84,7 +84,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold">Service calls</h1>
+        <h1 className="text-xl font-bold">Maintenance shifts</h1>
         <Link href="/calls/new" className="btn-primary min-h-11 px-4 text-sm">
           + New
         </Link>
@@ -169,13 +169,13 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
         </ul>
       ) : (
         <p className="card px-4 py-8 text-center text-sm text-muted">
-          No service calls match this filter.
+          No maintenance shifts match this filter.
         </p>
       )}
 
       {calls && calls.length === PAGE_SIZE && (
         <p className="px-1 text-center text-xs text-muted">
-          Showing the {PAGE_SIZE} most recent. Narrow the filters to see older calls.
+          Showing the {PAGE_SIZE} most recent. Narrow the filters to see older shifts.
         </p>
       )}
     </div>

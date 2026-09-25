@@ -10,7 +10,7 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
 
   const items: Item[] = [
     { href: "/", label: "Home", icon: "home" },
-    { href: "/calls", label: "Calls", icon: "clipboard" },
+    { href: "/calls", label: "Shifts", icon: "clipboard" },
     { href: "/expenses", label: "Receipts", icon: "receipt" },
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: "gear" } as const] : []),
   ];

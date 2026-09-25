@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Kapa Service Log",
-  description: "Service call and receipt logging for Kapa Property Company.",
+  description: "Maintenance shift and receipt logging for Kapa Property Company.",
   applicationName: "Kapa Service Log",
   appleWebApp: {
     capable: true,

@@ -1,7 +1,7 @@
 # Kapa Service Log
 
 A mobile-first app for Kapa Property Company. In-house maintenance engineers and
-outside vendors use it to log service calls as they finish them, and to submit
+outside vendors use it to log maintenance shifts as they finish them, and to submit
 credit card receipts against the property that should carry the expense.
 
 Built as a Next.js app on a Supabase Postgres database, with private storage
@@ -54,18 +54,18 @@ An in-house engineer can be tagged **Chief Engineer** in Admin → People. Other
 engineers and outside vendors are then placed under one chief with the
 **Reports to** picker.
 
-Every service call is saved as **Awaiting approval** and routed to the logger's
-chief. The chief sees a card on the Home screen with the count, and a
-**To approve** filter on the Calls screen. Opening a call gives them Approve or
+Every maintenance shift is saved as **Awaiting approval** and routed to the
+logger's chief. The chief sees a card on the Home screen with the count, and a
+**To approve** filter on the Shifts screen. Opening a shift gives them Approve or
 Send back, with an optional note that the engineer sees on the call.
 
 Rules the app holds to:
 
-- Only the chief a call was routed to, or an admin, can review it.
+- Only the chief a shift was routed to, or an admin, can review it.
 - Nobody approves their own work, including a chief and an admin.
 - Routing is snapshotted when the call is saved, so moving someone to a new
   chief never pulls work out of the old chief's queue.
-- Calls logged by someone with no chief stay pending and are visible to admins,
+- Shifts logged by someone with no chief stay pending and are visible to admins,
   who can approve them.
 
 The database enforces the structure independently: only in-house engineers can
@@ -77,17 +77,17 @@ themselves, and a chief cannot be untagged while people still report to them.
 Each in-house engineer has rate tiers set in **Admin → People**: three named by
 role (Chief Engineer, Building Engineer, Assistant Engineer) plus a custom one.
 Usually only the row matching that person's role carries a rate; the rest are
-left blank. One tier is marked active, and every call that engineer logs is
-priced from it.
+left blank. One tier is marked active, and every shift that engineer logs
+is priced from it.
 
 **Rates are admin-only.** Engineers never see a rate on the call form, in their
-history, or anywhere else — the amount is read from the database when the call
+history, or anywhere else — the amount is read from the database when the shift
 is saved, so it cannot be seen or influenced from the form. Admins see the
-amount on each call plus a billable total for whatever filter is applied on the
-Calls screen. Vendors see the amounts they quoted themselves, and nobody else's.
+amount on each shift plus a billable total for whatever filter is applied on
+the Shifts screen. Vendors see the amounts they quoted themselves, and nobody else's.
 
 Amounts are snapshots. Re-pricing a tier, renaming it, or deleting it never
-alters calls already logged, so what someone was paid last month stays what
+alters shifts already logged, so what someone was paid last month stays what
 they were paid.
 
 ## How people sign in
@@ -106,17 +106,17 @@ the database, so deactivating someone takes effect immediately.
 
 ## What gets logged
 
-**Service call** — date, Service Time (Regular or OT Rate), emergency or
-scheduled, and property are required. Space, a description of the work, a
+**Maintenance shift** — date, Shift Charge (Regular, x 1.5 Shift or
+x 2 Shift), shift type (emergency or scheduled), and property are required. Space, a description of the work, a
 follow-up flag with notes, and up to eight photos or PDFs are optional.
 
-A call can cover **two properties**, for an engineer who works both in one day:
-ticking "This call covers a second property" adds a second property and space.
-The two must be different, and filtering by a property finds calls where it is
+A shift can cover **two properties**, for an engineer who works both in one day:
+ticking "This shift covers a second property" adds a second property and space.
+The two must be different, and filtering by a property finds shifts where it is
 either the first or the second.
 
 An outside vendor also gets an optional **amount they are charging** for the
-job. An in-house engineer gets no money field at all: their calls are priced
+job. An in-house engineer gets no money field at all: their shifts are priced
 automatically from the rate an admin set for them.
 
 Space can be tapped from the property's list, typed free-hand, or left blank
@@ -125,8 +125,8 @@ case) is linked to it, so "suite 210" and picking *Suite 210* land on the same
 record; anything else is stored as a one-off label.
 
 **Credit card receipt** — amount, date, and the property to charge are required.
-A receipt image or PDF, store, category, notes, and a link to a related service
-call are optional.
+A receipt image or PDF, store, category, notes, and a link to a related
+maintenance shift are optional.
 
 Attachments offer two buttons: **Take photo** opens the camera straight away,
 and **Choose file** opens the phone's photo library and file browser, so a shot
@@ -161,11 +161,11 @@ global sign-out if a phone is lost.
 | `spaces` | Units, suites, and common areas within a property. Suggestions, not a closed list. |
 | `technicians` | In-house engineers and outside vendors, with PIN hash, admin and chief flags, and who they report to. |
 | `technician_rates` | Per-engineer billing tiers. Exactly one is the active rate. |
-| `service_calls` | One row per logged call, covering one or two properties, with its approval state. |
-| `service_call_photos` | Storage paths of the photos and PDFs attached to a call. |
+| `service_calls` | One row per logged maintenance shift, covering one or two properties, with its approval state. |
+| `service_call_photos` | Storage paths of the photos and PDFs attached to a shift. |
 | `expenses` | Credit card charges, each assigned to a property. |
 
-Service calls and expenses store a `property_label` / `space_label` snapshot
+Shifts and expenses store a `property_label` / `space_label` snapshot
 alongside the foreign key, so renaming or retiring a property never rewrites
 history.
 
@@ -198,3 +198,12 @@ npx supabase gen types typescript --project-id wvayvybbinywglriunxm > src/lib/da
 npm run build    # type-checks and compiles
 npx eslint .     # lint
 ```
+
+## Naming
+
+The feature engineers use is called a **Maintenance Shift**. The database
+tables are still named `service_calls` and `service_call_photos`, and the URLs
+are still `/calls` — renaming either would break links people have already
+saved to their phone home screen and would rewrite rows for no functional gain.
+The stored `hours_type` values likewise keep their original spelling, so
+`after_hours` is the **x 1.5 Shift** tier.

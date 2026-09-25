@@ -111,7 +111,7 @@ export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: stri
             className="size-6 shrink-0 rounded accent-brand-600"
           />
           <span className="text-base font-semibold">
-            Chief Engineer — approves their team&apos;s service calls
+            Chief Engineer — approves their team&apos;s maintenance shifts
           </span>
         </label>
       )}
@@ -120,7 +120,7 @@ export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: stri
         <Field
           label="Reports to"
           htmlFor="new-tech-chief"
-          hint="Their service calls go to this chief for approval."
+          hint="Their maintenance shifts go to this chief for approval."
         >
           <select id="new-tech-chief" name="chief_id" defaultValue="" className="input">
             <option value="">No chief yet</option>
@@ -135,16 +135,15 @@ export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: stri
 
       {kind === "in_house" ? (
         <div>
-          <p className="field-label">Service call rates</p>
+          <p className="field-label">Maintenance shift rates</p>
           <p className="mb-3 text-xs text-muted">
-            What this engineer is paid per completed call. They pick one of
-            these when logging a call.
+            What this engineer is paid per completed shift.
           </p>
           <RateRows />
         </div>
       ) : (
         <p className="rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-900">
-          Vendors enter the amount they agreed on each call, so there are no
+          Vendors enter the amount they agreed on each shift, so there are no
           rates to set here.
         </p>
       )}
@@ -172,7 +171,7 @@ export function TechnicianRatesForm({
   return (
     <form action={formAction} className="mt-3 border-t border-hairline pt-3">
       <input type="hidden" name="id" value={technicianId} />
-      <p className="field-label">Service call rates</p>
+      <p className="field-label">Maintenance shift rates</p>
       <RateRows rates={rates} />
       <FormError message={state.error} />
       <div className="mt-3 flex items-center gap-3">
