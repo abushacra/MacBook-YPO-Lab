@@ -94,9 +94,17 @@ Usually only the row matching that person's role carries a rate; the rest are
 left blank. One tier is marked active, and every shift that engineer logs
 is priced from it.
 
-**Rates are admin-only.** Engineers never see a rate on the call form, in their
+**A tier is the price of one Regular shift.** The Shift Charge on the shift
+multiplies it: x 1.5 Shift pays one and a half times the tier, x 2 Shift pays
+double. A $125 Building Engineer therefore earns $125, $187.50 or $250 depending
+on the charge. Products of an odd rate are rounded to the cent. Vendors are not
+multiplied — the amount a vendor types is the amount they agreed.
+
+**Rates are admin-only.** Engineers never see a rate on the shift form, in their
 history, or anywhere else — the amount is read from the database when the shift
-is saved, so it cannot be seen or influenced from the form. Admins see the
+is saved, so the rate itself cannot be seen or set from the form. The one thing
+an engineer chooses is the Shift Charge, and approval by their chief or an admin
+is what checks that claim. Admins see the
 amount on each shift plus a billable total for whatever filter is applied on
 the Shifts screen. Vendors see the amounts they quoted themselves, and nobody else's.
 
@@ -146,11 +154,15 @@ Bill-level fields sit on a bill's first row only; later rows repeat the Bill
 Number, which is how the importer groups lines onto one bill. Every line carries
 `Billable` TRUE and the property in `Customer/Project`.
 
-**A property worked at more than one Shift Charge produces one line per rate.**
+**A property worked at more than one Shift Charge produces one line per charge.**
 Two Regular shifts and one x 1.5 on the same property become a 2 x line and a
-1 x line. A single line cannot hold Quantity x Rate for mixed rates without its
-amount disagreeing with its own quantity and rate, so it is split. The bill
-total is identical either way.
+1 x line, and each line's `Description` names its charge. A single line cannot
+hold Quantity x Rate for mixed rates without its amount disagreeing with its own
+quantity and rate, so it is split. The bill total is identical either way, and a
+property worked at a single charge all period stays one line.
+
+The rate is part of the grouping key as well as the charge, so a tier an admin
+re-priced partway through a period cannot put two different prices on one line.
 
 Native bill import needs **QuickBooks Online Advanced**.
 

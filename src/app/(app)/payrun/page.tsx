@@ -5,6 +5,7 @@ import { buildPayRun, billNumber } from "@/lib/payrun";
 import { markPayRunBilled } from "@/lib/actions/payrun";
 import { formatDate, formatMoney, todayISO } from "@/lib/format";
 import { ConfirmButton } from "@/components/confirm-button";
+import { HOURS_TYPE_LABELS } from "@/lib/constants";
 
 export const metadata = { title: "Pay run · Kapa Service Log" };
 
@@ -173,7 +174,7 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                 <ul className="mt-3 divide-y divide-hairline border-t border-hairline">
                   {vendor.lines.map((line) => (
                     <li
-                      key={`${line.propertyId}-${line.rate}`}
+                      key={`${line.propertyId}-${line.hoursType}-${line.rate}`}
                       className="flex items-center justify-between gap-3 py-2"
                     >
                       <span className="min-w-0">
@@ -181,7 +182,8 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                           {line.customerName}
                         </span>
                         <span className="block text-xs text-muted">
-                          {line.shiftCount} &times; {formatMoney(line.rate)}
+                          {line.shiftCount} &times; {formatMoney(line.rate)} &middot;{" "}
+                          {HOURS_TYPE_LABELS[line.hoursType]}
                         </span>
                       </span>
                       <span className="shrink-0 text-sm font-bold">

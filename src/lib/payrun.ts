@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/supabase";
+import { asHoursType, type HoursType } from "@/lib/constants";
 
 /**
  * Builds a pay run: one vendor bill per person for the chosen dates, with one
@@ -21,6 +22,12 @@ export type PayRunLine = {
    * product, so Quantity x Rate is the line amount.
    */
   rate: number;
+  /**
+   * The Shift Charge every shift on this line was logged at. Named on the bill
+   * line so a Regular line and an x 2 line at the same property can be told
+   * apart without doing the arithmetic.
+   */
+  hoursType: HoursType;
   shiftCount: number;
   amount: number;
 };
@@ -54,6 +61,7 @@ export type PayRunShift = {
   property_id: string;
   property_label: string;
   property_id_2: string | null;
+  hours_type: string;
   billed_amount: number | null;
   approval_status: string;
   billed_at: string | null;
@@ -64,7 +72,7 @@ export async function buildPayRun(from: string, to: string): Promise<PayRun> {
     db()
       .from("service_calls")
       .select(
-        "id, technician_id, call_date, property_id, property_label, property_id_2, billed_amount, approval_status, billed_at",
+        "id, technician_id, call_date, property_id, property_label, property_id_2, hours_type, billed_amount, approval_status, billed_at",
       )
       .gte("call_date", from)
       .lte("call_date", to),
@@ -120,21 +128,27 @@ export function groupPayRun(
     grouped.set(shift.technician_id, byProperty);
 
     /*
-     * Grouped by property AND per-shift rate. Each shift is one unit of the
+     * Grouped by property AND Shift Charge. Each shift is one unit of the
      * product, so a line carries Quantity x Rate — which only holds if every
-     * shift on it was billed at the same rate. A property worked at both
-     * Regular and x 2 therefore produces two lines rather than one line whose
-     * amount does not match its quantity times its rate.
+     * shift on it was billed at the same rate, and the charge is what changes
+     * the rate. A property worked at both Regular and x 2 therefore produces
+     * two lines rather than one line whose amount does not match its quantity
+     * times its rate.
+     *
+     * The rate is in the key as well, so a tier an admin changed partway
+     * through the period cannot put two different prices on one line either.
      *
      * Keyed on the property id so renaming a property keeps its shifts together.
      */
-    const key = `${shift.property_id}|${shift.billed_amount.toFixed(2)}`;
+    const hoursType = asHoursType(shift.hours_type);
+    const key = `${shift.property_id}|${hoursType}|${shift.billed_amount.toFixed(2)}`;
     const line = byProperty.get(key) ?? {
       propertyId: shift.property_id,
       // The live name is what must match the QuickBooks customer; the stored
       // label is the fallback if the property was renamed out from under us.
       customerName: propertyNameById.get(shift.property_id) ?? shift.property_label,
       rate: shift.billed_amount,
+      hoursType,
       shiftCount: 0,
       amount: 0,
       splitShifts: 0,
@@ -157,10 +171,11 @@ export function groupPayRun(
         technicianId,
         vendorName: technician?.name ?? "Unknown",
         kind: technician?.kind ?? "in_house",
-        lines: lines.map(({ propertyId, customerName, rate, shiftCount, amount }) => ({
+        lines: lines.map(({ propertyId, customerName, rate, hoursType, shiftCount, amount }) => ({
           propertyId,
           customerName,
           rate,
+          hoursType,
           shiftCount,
           amount,
         })),

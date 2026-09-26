@@ -8,6 +8,7 @@ import { requireAdmin, requireUser } from "@/lib/auth";
 import { PHOTO_BUCKET, db } from "@/lib/supabase";
 import { alertOversight } from "@/lib/push";
 import { CALL_TYPES, HOURS_TYPES } from "@/lib/constants";
+import { shiftRate, shiftRateLabel } from "@/lib/rates";
 import {
   type FormState,
   checkbox,
@@ -132,9 +133,10 @@ export async function createServiceCall(
   let billedAmount: number | null = null;
 
   if (user.kind === "in_house") {
-    // Priced from the tier an admin marked active for this engineer. Nothing
-    // about the rate comes from the form, so an engineer can neither see their
-    // rate nor influence what a call is billed at.
+    // Priced from the tier an admin marked active for this engineer. The rate
+    // itself never comes from the form, so an engineer cannot see it or set it;
+    // the one thing they choose is the Shift Charge, and the chief or admin
+    // approving the shift is what checks that claim.
     const { data: rate } = await db()
       .from("technician_rates")
       .select("id, label, amount")
@@ -143,9 +145,11 @@ export async function createServiceCall(
       .maybeSingle();
 
     if (rate) {
+      // The assigned rate is the price of one Regular shift; the Shift Charge
+      // the engineer picked multiplies it (x 1.5, x 2).
       rateId = rate.id;
-      billedLabel = rate.label;
-      billedAmount = rate.amount;
+      billedLabel = shiftRateLabel(rate.label, input.hours_type);
+      billedAmount = shiftRate(rate.amount, input.hours_type);
     }
   } else {
     const raw = text(formData, "billed_amount").replace(/[$,\s]/g, "");

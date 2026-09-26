@@ -1,5 +1,6 @@
 import type { PayRun } from "@/lib/payrun";
 import { billNumber } from "@/lib/payrun";
+import { HOURS_TYPE_LABELS } from "@/lib/constants";
 
 /**
  * Renders a pay run as a QuickBooks Online bill-import CSV.
@@ -11,9 +12,10 @@ import { billNumber } from "@/lib/payrun";
  * bill.
  *
  * Every line is an "Item Details" row: one shift is one unit of the product, so
- * Quantity is the shift count and Rate is what a shift was billed at. Each line
- * carries the property as Customer/Project with Billable set, so it can be
- * charged on for reimbursement.
+ * Quantity is the shift count and Rate is what a shift was billed at. The
+ * Description names the Shift Charge behind that rate. Each line carries the
+ * property as Customer/Project with Billable set, so it can be charged on for
+ * reimbursement.
  */
 
 export const BILL_CSV_HEADERS = [
@@ -73,7 +75,7 @@ export function payRunCsv(payRun: PayRun, productService: string): string {
           productService,
           String(line.shiftCount),
           line.rate.toFixed(2),
-          `${line.shiftCount} shift${line.shiftCount === 1 ? "" : "s"} at ${line.rate.toFixed(2)} — ${usDate(payRun.from)} to ${usDate(payRun.to)}`,
+          `${line.shiftCount} shift${line.shiftCount === 1 ? "" : "s"} at ${line.rate.toFixed(2)} · ${HOURS_TYPE_LABELS[line.hoursType]} — ${usDate(payRun.from)} to ${usDate(payRun.to)}`,
           line.amount.toFixed(2),
           "TRUE",
           line.customerName,

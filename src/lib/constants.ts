@@ -11,6 +11,15 @@ export type TechnicianKind = (typeof TECHNICIAN_KINDS)[number];
  * original spelling — renaming them would mean rewriting shifts already
  * logged — so `after_hours` is the x 1.5 tier.
  */
+/**
+ * Narrows a Shift Charge read back out of the database. The column is a plain
+ * text column, so anything unrecognised is treated as Regular rather than
+ * crashing a pay run over one bad row.
+ */
+export function asHoursType(value: string): HoursType {
+  return (HOURS_TYPES as readonly string[]).includes(value) ? (value as HoursType) : "regular";
+}
+
 export const HOURS_TYPE_LABELS: Record<HoursType, string> = {
   regular: "Regular",
   after_hours: "x 1.5 Shift",
