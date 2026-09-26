@@ -5,13 +5,21 @@ import { usePathname } from "next/navigation";
 
 type Item = { href: string; label: string; icon: "home" | "clipboard" | "receipt" | "gear" };
 
-export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
+export function BottomNav({
+  isAdmin,
+  showReceipts,
+}: {
+  isAdmin: boolean;
+  showReceipts: boolean;
+}) {
   const pathname = usePathname();
 
   const items: Item[] = [
     { href: "/", label: "Home", icon: "home" },
     { href: "/calls", label: "Shifts", icon: "clipboard" },
-    { href: "/expenses", label: "Receipts", icon: "receipt" },
+    ...(showReceipts
+      ? [{ href: "/expenses", label: "Receipts", icon: "receipt" } as const]
+      : []),
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: "gear" } as const] : []),
   ];
 

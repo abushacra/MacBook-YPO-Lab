@@ -45,6 +45,14 @@ export async function requireUser(): Promise<CurrentUser> {
   return user;
 }
 
+/**
+ * Receipts are an oversight task: chiefs log them, and admins can too since
+ * an admin is the backstop everywhere else in the app.
+ */
+export function canLogReceipts(user: CurrentUser): boolean {
+  return user.is_chief || user.is_admin;
+}
+
 export async function requireAdmin(): Promise<CurrentUser> {
   const user = await requireUser();
   if (!user.is_admin) redirect("/");

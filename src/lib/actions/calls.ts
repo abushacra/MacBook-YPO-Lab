@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { PHOTO_BUCKET, db } from "@/lib/supabase";
+import { alertOversight } from "@/lib/push";
 import { CALL_TYPES, HOURS_TYPES } from "@/lib/constants";
 import {
   type FormState,
@@ -201,6 +202,16 @@ export async function createServiceCall(
       .from("service_call_photos")
       .insert(photos.map((storage_path) => ({ service_call_id: created.id, storage_path })));
   }
+
+  await alertOversight({
+    title: "Maintenance shift logged",
+    body: `${user.name} · ${primary.propertyLabel}${
+      primary.spaceLabel ? ` · ${primary.spaceLabel}` : ""
+    }`,
+    url: `/calls/${created.id}`,
+    actorId: user.id,
+    chiefId: user.chief_id,
+  });
 
   revalidatePath("/");
   revalidatePath("/calls");

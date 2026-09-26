@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/auth";
+import { canLogReceipts, requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
+import { alertOversight } from "@/lib/push";
+import { formatMoney } from "@/lib/format";
 import {
   type FormState,
   optionalText,
@@ -25,6 +27,9 @@ const schema = z.object({
 
 export async function createExpense(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
+  if (!canLogReceipts(user)) {
+    return { error: "Only chief engineers and admins can log receipts." };
+  }
 
   const rawAmount = text(formData, "amount").replace(/[$,\s]/g, "");
   const parsed = schema.safeParse({
@@ -88,6 +93,14 @@ export async function createExpense(_prev: FormState, formData: FormData): Promi
   if (error || !created) {
     return { error: "Could not save the receipt. Check your signal and try again." };
   }
+
+  await alertOversight({
+    title: "Receipt logged",
+    body: `${user.name} · ${formatMoney(input.amount)} · ${property.name}`,
+    url: "/expenses",
+    actorId: user.id,
+    chiefId: user.chief_id,
+  });
 
   revalidatePath("/");
   revalidatePath("/expenses");

@@ -1,6 +1,8 @@
 import Link from "next/link";
 
-import { requireUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+import { canLogReceipts, requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { formatDate, formatMoney } from "@/lib/format";
 import { PropertyFilter } from "@/components/property-filter";
@@ -15,6 +17,8 @@ function one(value: string | string[] | undefined): string {
 
 export default async function ExpensesPage({ searchParams }: PageProps<"/expenses">) {
   const user = await requireUser();
+  if (!canLogReceipts(user)) redirect("/");
+
   const params = await searchParams;
   const scope = one(params.scope) || "all";
   const propertyId = one(params.property);

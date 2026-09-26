@@ -104,6 +104,32 @@ Amounts are snapshots. Re-pricing a tier, renaming it, or deleting it never
 alters shifts already logged, so what someone was paid last month stays what
 they were paid.
 
+## Alerts
+
+Admins and chiefs can switch on **push notifications** from a card on the Home
+screen — one tap, per device. When a maintenance shift or a receipt is saved,
+every active admin plus the chief that work belongs to gets a notification;
+other chiefs are left out so nobody hears about another team's work, and the
+person who did the saving is not told about their own action.
+
+Push was chosen over text and email: it costs nothing per message, needs no
+carrier registration, and lands on the phone like a text. **On an iPhone it only
+works when the app is opened from the home-screen icon**, which is already how
+engineers are told to install it; the card explains this if someone taps it in
+Safari instead.
+
+Sending is best effort by design. A missing key, a blocked notification or a
+dead subscription is swallowed, so an alert failure can never stop an
+engineer's shift from saving. Subscriptions the browser has discarded are
+deleted when the push is rejected.
+
+Setup needs a VAPID key pair in the environment — see `.env.example`. Generate
+one with:
+
+```bash
+node -e "console.log(require('web-push').generateVAPIDKeys())"
+```
+
 ## How people sign in
 
 There are no passwords or email invitations. Someone is added in Admin, and the
@@ -138,7 +164,9 @@ for whole-property work. A typed value that matches a managed space (ignoring
 case) is linked to it, so "suite 210" and picking *Suite 210* land on the same
 record; anything else is stored as a one-off label.
 
-**Credit card receipt** — amount, date, and the property to charge are required.
+**Credit card receipt** — logged by **chief engineers and admins only**; the
+Receipts tab is hidden from everyone else. Amount, date, and the property to
+charge are required.
 A receipt image or PDF, store, category, notes, and a link to a related
 maintenance shift are optional.
 
@@ -178,6 +206,7 @@ global sign-out if a phone is lost.
 | `service_calls` | One row per logged maintenance shift, covering one or two properties, with its approval state. |
 | `service_call_photos` | Storage paths of the photos and PDFs attached to a shift. |
 | `expenses` | Credit card charges, each assigned to a property. |
+| `push_subscriptions` | One row per device signed up for alerts, keyed by the browser's endpoint. |
 
 Shifts and expenses store a `property_label` / `space_label` snapshot
 alongside the foreign key, so renaming or retiring a property never rewrites

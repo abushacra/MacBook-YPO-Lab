@@ -1,9 +1,10 @@
 import Link from "next/link";
 
-import { requireUser } from "@/lib/auth";
+import { canLogReceipts, requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { formatDate, formatLocation } from "@/lib/format";
 import { CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
+import { PushToggle } from "@/components/push-toggle";
 
 export const metadata = { title: "Home · Kapa Service Log" };
 
@@ -38,10 +39,14 @@ export default async function HomePage() {
         <Link href="/calls/new" className="btn-primary w-full py-4 text-lg">
           Log a maintenance shift
         </Link>
-        <Link href="/expenses/new" className="btn-secondary w-full py-4 text-lg">
-          Log a credit card receipt
-        </Link>
+        {canLogReceipts(user) && (
+          <Link href="/expenses/new" className="btn-secondary w-full py-4 text-lg">
+            Log a credit card receipt
+          </Link>
+        )}
       </section>
+
+      {(user.is_chief || user.is_admin) && <PushToggle />}
 
       {(user.is_chief || user.is_admin) && (pendingCount ?? 0) > 0 && (
         <Link
