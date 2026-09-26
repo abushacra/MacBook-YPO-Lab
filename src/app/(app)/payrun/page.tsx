@@ -32,12 +32,12 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
   const fallback = defaultRange();
   const from = isDate(one(params.from)) ? one(params.from) : fallback.from;
   const to = isDate(one(params.to)) ? one(params.to) : fallback.to;
-  const account = one(params.account);
+  const item = one(params.item);
 
   const payRun = await buildPayRun(from, to);
 
   const csvHref = `/api/payrun?from=${from}&to=${to}${
-    account ? `&account=${encodeURIComponent(account)}` : ""
+    item ? `&item=${encodeURIComponent(item)}` : ""
   }`;
 
   return (
@@ -70,21 +70,21 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
         </div>
 
         <div>
-          <label className="field-label" htmlFor="account">
-            Expense account
-            <span className="ml-1.5 text-xs font-medium text-muted">Optional</span>
+          <label className="field-label" htmlFor="item">
+            Product / service
           </label>
           <input
-            id="account"
-            name="account"
+            id="item"
+            name="item"
             type="text"
-            defaultValue={account}
-            placeholder="e.g. Repairs &amp; Maintenance"
+            defaultValue={item}
+            placeholder="e.g. Maintenance Shift"
             className="input"
           />
           <p className="field-hint">
-            Goes in the Category/Account column. QuickBooks requires an account on
-            every bill line, so the download waits until this is filled in.
+            Goes in the Product/Service column, and must already exist in
+            QuickBooks. Each shift counts as one of them, so Quantity &times; Rate
+            is the line amount.
           </p>
         </div>
 
@@ -145,14 +145,14 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
         </p>
       ) : (
         <>
-          {account ? (
+          {item ? (
             <a href={csvHref} className="btn-primary w-full">
               Download bills CSV for QuickBooks
             </a>
           ) : (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-              Enter the expense account above to enable the download — QuickBooks
-              rejects a bill line without one.
+              Name the product / service above to enable the download — an item
+              line needs one.
             </p>
           )}
 
@@ -173,7 +173,7 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                 <ul className="mt-3 divide-y divide-hairline border-t border-hairline">
                   {vendor.lines.map((line) => (
                     <li
-                      key={line.propertyId}
+                      key={`${line.propertyId}-${line.rate}`}
                       className="flex items-center justify-between gap-3 py-2"
                     >
                       <span className="min-w-0">
@@ -181,7 +181,7 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                           {line.customerName}
                         </span>
                         <span className="block text-xs text-muted">
-                          {line.shiftCount} shift{line.shiftCount === 1 ? "" : "s"}
+                          {line.shiftCount} &times; {formatMoney(line.rate)}
                         </span>
                       </span>
                       <span className="shrink-0 text-sm font-bold">

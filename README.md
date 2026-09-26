@@ -133,16 +133,24 @@ node -e "console.log(require('web-push').generateVAPIDKeys())"
 ## Pay run — bills for QuickBooks Online
 
 **Admin → Pay run** turns logged work into vendor bills. Pick a date range, name
-the expense account, and the screen groups everything into **one bill per
-person, with one line per property** holding that property's shift total — so
-each line can be charged to the property's customer for reimbursement.
+the product/service, and the screen groups everything into **one bill per
+person, with a line per property** — so each line can be charged to the
+property's customer for reimbursement.
+
+Lines are **Item Details** rows: one shift is one unit of the product, so
+Quantity is the shift count and Rate is what a shift was billed at.
 
 Download gives a CSV matching Intuit's `sample_bills_import` template exactly:
 the same nineteen headers, a UTF-8 BOM, CRLF endings and MM/DD/YYYY dates.
 Bill-level fields sit on a bill's first row only; later rows repeat the Bill
-Number, which is how the importer groups lines onto one bill. Every line is a
-**Category Details** row with `Billable` TRUE and the property in
-`Customer/Project`.
+Number, which is how the importer groups lines onto one bill. Every line carries
+`Billable` TRUE and the property in `Customer/Project`.
+
+**A property worked at more than one Shift Charge produces one line per rate.**
+Two Regular shifts and one x 1.5 on the same property become a 2 x line and a
+1 x line. A single line cannot hold Quantity x Rate for mixed rates without its
+amount disagreeing with its own quantity and rate, so it is split. The bill
+total is identical either way.
 
 Native bill import needs **QuickBooks Online Advanced**.
 
@@ -153,8 +161,9 @@ there — the importer will not create them:
 
 - each person's name in Admin → People must match their **Vendor** in QuickBooks
 - each property's name must match its **Customer**
-- the expense account must exist, and
-  **Account and Settings → Expenses → Track expenses and items by customer**
+- the **product/service** must exist under Products and services, and be set up
+  so it can be bought from a vendor
+- **Account and Settings → Expenses → Track expenses and items by customer**
   must be on, or bills have no Customer column at all
 
 ### What the run deliberately leaves out

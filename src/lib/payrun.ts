@@ -16,6 +16,11 @@ export type PayRunLine = {
   propertyId: string;
   /** The property's current name, which is what must match the QuickBooks customer. */
   customerName: string;
+  /**
+   * What one shift on this line was billed at. Each shift is one unit of the
+   * product, so Quantity x Rate is the line amount.
+   */
+  rate: number;
   shiftCount: number;
   amount: number;
 };
@@ -94,7 +99,7 @@ export function groupPayRun(
   let unapprovedCount = 0;
   let alreadyBilledCount = 0;
 
-  // technician -> property key -> line
+  // technician -> "property + rate" -> line
   const grouped = new Map<string, Map<string, PayRunLine & { splitShifts: number }>>();
 
   for (const shift of shifts) {
@@ -114,13 +119,22 @@ export function groupPayRun(
     const byProperty = grouped.get(shift.technician_id) ?? new Map();
     grouped.set(shift.technician_id, byProperty);
 
-    // Group on the id so renaming a property keeps its shifts on one line.
-    const key = shift.property_id;
+    /*
+     * Grouped by property AND per-shift rate. Each shift is one unit of the
+     * product, so a line carries Quantity x Rate — which only holds if every
+     * shift on it was billed at the same rate. A property worked at both
+     * Regular and x 2 therefore produces two lines rather than one line whose
+     * amount does not match its quantity times its rate.
+     *
+     * Keyed on the property id so renaming a property keeps its shifts together.
+     */
+    const key = `${shift.property_id}|${shift.billed_amount.toFixed(2)}`;
     const line = byProperty.get(key) ?? {
       propertyId: shift.property_id,
       // The live name is what must match the QuickBooks customer; the stored
       // label is the fallback if the property was renamed out from under us.
       customerName: propertyNameById.get(shift.property_id) ?? shift.property_label,
+      rate: shift.billed_amount,
       shiftCount: 0,
       amount: 0,
       splitShifts: 0,
@@ -134,8 +148,8 @@ export function groupPayRun(
 
   const vendors: PayRunVendor[] = [...grouped.entries()]
     .map(([technicianId, byProperty]) => {
-      const lines = [...byProperty.values()].sort((a, b) =>
-        a.customerName.localeCompare(b.customerName),
+      const lines = [...byProperty.values()].sort(
+        (a, b) => a.customerName.localeCompare(b.customerName) || b.rate - a.rate,
       );
       const technician = technicianById.get(technicianId);
 
@@ -143,9 +157,10 @@ export function groupPayRun(
         technicianId,
         vendorName: technician?.name ?? "Unknown",
         kind: technician?.kind ?? "in_house",
-        lines: lines.map(({ propertyId, customerName, shiftCount, amount }) => ({
+        lines: lines.map(({ propertyId, customerName, rate, shiftCount, amount }) => ({
           propertyId,
           customerName,
+          rate,
           shiftCount,
           amount,
         })),

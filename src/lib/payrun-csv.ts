@@ -10,9 +10,10 @@ import { billNumber } from "@/lib/payrun";
  * Bill Number leave them blank, which is how the importer groups lines onto one
  * bill.
  *
- * Every line is a "Category Details" row — an expense posted to an account —
- * carrying the property as Customer/Project with Billable set, so the line can
- * be charged on for reimbursement.
+ * Every line is an "Item Details" row: one shift is one unit of the product, so
+ * Quantity is the shift count and Rate is what a shift was billed at. Each line
+ * carries the property as Customer/Project with Billable set, so it can be
+ * charged on for reimbursement.
  */
 
 export const BILL_CSV_HEADERS = [
@@ -47,7 +48,7 @@ export function usDate(iso: string): string {
   return `${month}/${day}/${year}`;
 }
 
-export function payRunCsv(payRun: PayRun, account: string): string {
+export function payRunCsv(payRun: PayRun, productService: string): string {
   const memo = `Maintenance shifts ${usDate(payRun.from)} to ${usDate(payRun.to)}`;
   const rows: string[] = [BILL_CSV_HEADERS.map(csvCell).join(",")];
 
@@ -67,12 +68,12 @@ export function payRunCsv(payRun: PayRun, account: string): string {
           "", // Due Date — derived from those terms
           "", // Location
           first ? memo : "",
-          "Category Details",
-          account,
-          "", // Product/Service — not an item line
-          "", // Quantity
-          "", // Rate
-          `${line.shiftCount} shift${line.shiftCount === 1 ? "" : "s"} — ${usDate(payRun.from)} to ${usDate(payRun.to)}`,
+          "Item Details",
+          "", // Category/Account — not a category line
+          productService,
+          String(line.shiftCount),
+          line.rate.toFixed(2),
+          `${line.shiftCount} shift${line.shiftCount === 1 ? "" : "s"} at ${line.rate.toFixed(2)} — ${usDate(payRun.from)} to ${usDate(payRun.to)}`,
           line.amount.toFixed(2),
           "TRUE",
           line.customerName,
