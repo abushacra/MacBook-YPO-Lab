@@ -35,7 +35,12 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-bold">Admin</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold">Admin</h1>
+        <Link href="/payrun" className="btn-secondary min-h-11 px-4 text-sm">
+          Pay run
+        </Link>
+      </div>
 
       <div className="flex gap-2">
         {[

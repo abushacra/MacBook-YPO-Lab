@@ -130,6 +130,51 @@ one with:
 node -e "console.log(require('web-push').generateVAPIDKeys())"
 ```
 
+## Pay run — bills for QuickBooks Online
+
+**Admin → Pay run** turns logged work into vendor bills. Pick a date range, name
+the expense account, and the screen groups everything into **one bill per
+person, with one line per property** holding that property's shift total — so
+each line can be charged to the property's customer for reimbursement.
+
+Download gives a CSV matching Intuit's `sample_bills_import` template exactly:
+the same nineteen headers, a UTF-8 BOM, CRLF endings and MM/DD/YYYY dates.
+Bill-level fields sit on a bill's first row only; later rows repeat the Bill
+Number, which is how the importer groups lines onto one bill. Every line is a
+**Category Details** row with `Billable` TRUE and the property in
+`Customer/Project`.
+
+Native bill import needs **QuickBooks Online Advanced**.
+
+### Before the first import
+
+The names must match QuickBooks exactly, and the records must already exist
+there — the importer will not create them:
+
+- each person's name in Admin → People must match their **Vendor** in QuickBooks
+- each property's name must match its **Customer**
+- the expense account must exist, and
+  **Account and Settings → Expenses → Track expenses and items by customer**
+  must be on, or bills have no Customer column at all
+
+### What the run deliberately leaves out
+
+Each is counted and shown rather than dropped quietly:
+
+- shifts still **awaiting approval** — sign them off first
+- approved shifts with **no amount**, from an engineer with no rate set or a
+  vendor who left it blank. Nobody gets paid for these, so they are worth chasing
+- shifts **already billed** on an earlier run
+
+A shift covering two properties keeps its whole amount on the first property and
+is flagged, rather than being split on a guess.
+
+### Not paying twice
+
+**Mark this run as billed** stamps every shift in the window, so a later run
+over overlapping dates cannot pay the same work again. Do it once the import has
+actually succeeded.
+
 ## How people sign in
 
 There are no passwords or email invitations. Someone is added in Admin, and the

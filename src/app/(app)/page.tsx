@@ -46,6 +46,12 @@ export default async function HomePage() {
         )}
       </section>
 
+      {user.is_admin && (
+        <Link href="/payrun" className="btn-secondary w-full py-4 text-lg">
+          Pay run — bills for QuickBooks
+        </Link>
+      )}
+
       {(user.is_chief || user.is_admin) && <PushToggle />}
 
       {(user.is_chief || user.is_admin) && (pendingCount ?? 0) > 0 && (

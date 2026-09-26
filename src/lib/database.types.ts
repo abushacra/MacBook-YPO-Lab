@@ -182,6 +182,8 @@ export type Database = {
           property_id: string
           property_label: string
           approval_status: string
+          billed_at: string | null
+          billed_reference: string | null
           routed_to_chief_id: string | null
           reviewed_by: string | null
           reviewed_at: string | null
@@ -210,6 +212,8 @@ export type Database = {
           property_id: string
           property_label: string
           approval_status?: string
+          billed_at?: string | null
+          billed_reference?: string | null
           routed_to_chief_id?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
@@ -238,6 +242,8 @@ export type Database = {
           property_id?: string
           property_label?: string
           approval_status?: string
+          billed_at?: string | null
+          billed_reference?: string | null
           routed_to_chief_id?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
