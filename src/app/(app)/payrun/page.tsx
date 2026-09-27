@@ -34,12 +34,22 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
   const from = isDate(one(params.from)) ? one(params.from) : fallback.from;
   const to = isDate(one(params.to)) ? one(params.to) : fallback.to;
   const item = one(params.item);
+  const category = one(params.category);
 
   const payRun = await buildPayRun(from, to);
 
+  // An engineer's shifts become product lines and a vendor's become expense
+  // category lines, so a run only needs the name for the kinds it actually has.
+  const needsItem = payRun.vendors.some((vendor) => vendor.billAs === "item");
+  const needsCategory = payRun.vendors.some((vendor) => vendor.billAs === "category");
+  const missing = [
+    needsItem && !item ? "the product / service" : null,
+    needsCategory && !category ? "the expense category" : null,
+  ].filter((label): label is string => label !== null);
+
   const csvHref = `/api/payrun?from=${from}&to=${to}${
     item ? `&item=${encodeURIComponent(item)}` : ""
-  }`;
+  }${category ? `&category=${encodeURIComponent(category)}` : ""}`;
 
   return (
     <div className="space-y-5">
@@ -83,9 +93,28 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
             className="input"
           />
           <p className="field-hint">
-            Goes in the Product/Service column, and must already exist in
-            QuickBooks. Each shift counts as one of them, so Quantity &times; Rate
-            is the line amount.
+            For in-house engineers. Goes in the Product/Service column and must
+            already exist in QuickBooks. Each shift counts as one of them, so
+            Quantity &times; Rate is the line amount.
+          </p>
+        </div>
+
+        <div>
+          <label className="field-label" htmlFor="category">
+            Expense category
+          </label>
+          <input
+            id="category"
+            name="category"
+            type="text"
+            defaultValue={category}
+            placeholder="e.g. Repairs &amp; Maintenance"
+            className="input"
+          />
+          <p className="field-hint">
+            For outside vendors. Goes in the Category/Account column and must
+            match an account in your chart of accounts. A vendor&apos;s whole
+            total for a property sits on one line.
           </p>
         </div>
 
@@ -146,14 +175,16 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
         </p>
       ) : (
         <>
-          {item ? (
+          {missing.length === 0 ? (
             <a href={csvHref} className="btn-primary w-full">
               Download bills CSV for QuickBooks
             </a>
           ) : (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-              Name the product / service above to enable the download — an item
-              line needs one.
+              Name {missing.join(" and ")} above to enable the download — this run
+              has {needsItem && needsCategory ? "both engineer and vendor bills" : null}
+              {needsItem && !needsCategory ? "engineer bills, billed as items" : null}
+              {needsCategory && !needsItem ? "vendor bills, posted to a category" : null}.
             </p>
           )}
 
@@ -165,7 +196,8 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                     <p className="truncate font-bold">{vendor.vendorName}</p>
                     <p className="text-xs text-muted">
                       Bill {billNumber(to, index)} · {vendor.shiftCount} shift
-                      {vendor.shiftCount === 1 ? "" : "s"}
+                      {vendor.shiftCount === 1 ? "" : "s"} ·{" "}
+                      {vendor.billAs === "item" ? "billed as items" : "expense category"}
                     </p>
                   </div>
                   <p className="shrink-0 text-lg font-bold">{formatMoney(vendor.total)}</p>
@@ -174,7 +206,11 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                 <ul className="mt-3 divide-y divide-hairline border-t border-hairline">
                   {vendor.lines.map((line) => (
                     <li
-                      key={`${line.propertyId}-${line.hoursType}-${line.rate}`}
+                      key={
+                        line.billAs === "item"
+                          ? `${line.propertyId}-${line.hoursType}-${line.rate}`
+                          : line.propertyId
+                      }
                       className="flex items-center justify-between gap-3 py-2"
                     >
                       <span className="min-w-0">
@@ -182,8 +218,16 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                           {line.customerName}
                         </span>
                         <span className="block text-xs text-muted">
-                          {line.shiftCount} &times; {formatMoney(line.rate)} &middot;{" "}
-                          {HOURS_TYPE_LABELS[line.hoursType]}
+                          {line.billAs === "item" ? (
+                            <>
+                              {line.shiftCount} &times; {formatMoney(line.rate)} &middot;{" "}
+                              {HOURS_TYPE_LABELS[line.hoursType]}
+                            </>
+                          ) : (
+                            <>
+                              {line.shiftCount} shift{line.shiftCount === 1 ? "" : "s"}
+                            </>
+                          )}
                         </span>
                       </span>
                       <span className="shrink-0 text-sm font-bold">

@@ -141,12 +141,9 @@ node -e "console.log(require('web-push').generateVAPIDKeys())"
 ## Pay run — bills for QuickBooks Online
 
 **Admin → Pay run** turns logged work into vendor bills. Pick a date range, name
-the product/service, and the screen groups everything into **one bill per
+what the lines post to, and the screen groups everything into **one bill per
 person, with a line per property** — so each line can be charged to the
 property's customer for reimbursement.
-
-Lines are **Item Details** rows: one shift is one unit of the product, so
-Quantity is the shift count and Rate is what a shift was billed at.
 
 Download gives a CSV matching Intuit's `sample_bills_import` template exactly:
 the same nineteen headers, a UTF-8 BOM, CRLF endings and MM/DD/YYYY dates.
@@ -154,15 +151,33 @@ Bill-level fields sit on a bill's first row only; later rows repeat the Bill
 Number, which is how the importer groups lines onto one bill. Every line carries
 `Billable` TRUE and the property in `Customer/Project`.
 
-**A property worked at more than one Shift Charge produces one line per charge.**
-Two Regular shifts and one x 1.5 on the same property become a 2 x line and a
-1 x line, and each line's `Description` names its charge. A single line cannot
-hold Quantity x Rate for mixed rates without its amount disagreeing with its own
-quantity and rate, so it is split. The bill total is identical either way, and a
-property worked at a single charge all period stays one line.
+### Two kinds of line
 
-The rate is part of the grouping key as well as the charge, so a tier an admin
-re-priced partway through a period cannot put two different prices on one line.
+Who logged the shift decides how it is billed. A person is all one or all the
+other, so a bill never mixes the two.
+
+| | In-house engineer | Outside vendor |
+| --- | --- | --- |
+| `*Type` | `Item Details` | `Category Details` |
+| Posts to | the **product/service** | the **expense category** |
+| `Quantity` / `Rate` | shift count × per-shift rate | empty |
+| Lines per property | one per Shift Charge | always one |
+
+An item row has to satisfy Quantity × Rate = Amount, so **an engineer's property
+worked at more than one Shift Charge produces one line per charge**: two Regular
+shifts and one x 1.5 become a 2 × line and a 1 × line, each naming its charge in
+`Description`. Splitting is what keeps a line's amount from contradicting its own
+quantity and rate; the bill total is identical either way, and a property worked
+at a single charge all period stays one line. The rate is in the grouping key as
+well as the charge, so a tier an admin re-priced partway through a period cannot
+put two prices on one line.
+
+A category row carries an amount and nothing else, so **a vendor's shifts at one
+property always collapse onto a single line** however differently each job was
+quoted.
+
+The run only asks for the names it needs: an all-engineer week needs no expense
+category, an all-vendor week needs no product.
 
 Native bill import needs **QuickBooks Online Advanced**.
 
@@ -174,7 +189,9 @@ there — the importer will not create them:
 - each person's name in Admin → People must match their **Vendor** in QuickBooks
 - each property's name must match its **Customer**
 - the **product/service** must exist under Products and services, and be set up
-  so it can be bought from a vendor
+  so it can be bought from a vendor — needed only if the run has in-house engineers
+- the **expense category** must be an account in your chart of accounts — needed
+  only if the run has outside vendors
 - **Account and Settings → Expenses → Track expenses and items by customer**
   must be on, or bills have no Customer column at all
 

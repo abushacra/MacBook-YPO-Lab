@@ -8,19 +8,31 @@ import { asHoursType, type HoursType } from "@/lib/constants";
  * line per property holding that property's shift total, so each line can be
  * charged to the property's customer for reimbursement.
  *
+ * An in-house engineer's lines are product lines; an outside vendor's are
+ * expense-category lines. That is the only difference, and it changes how
+ * finely the lines are grouped — see the keying in `groupPayRun`.
+ *
  * Only shifts that are approved AND priced AND not already billed are included.
  * Anything left out is counted and reported rather than silently dropped —
  * an unpriced shift is money nobody gets paid for.
  */
 
-export type PayRunLine = {
+type PayRunLineBase = {
   propertyId: string;
   /** The property's current name, which is what must match the QuickBooks customer. */
   customerName: string;
-  /**
-   * What one shift on this line was billed at. Each shift is one unit of the
-   * product, so Quantity x Rate is the line amount.
-   */
+  shiftCount: number;
+  amount: number;
+};
+
+/**
+ * An in-house engineer's shifts, billed as a product. Each shift is one unit, so
+ * Quantity x Rate has to equal the amount — which means a line can only hold
+ * shifts that were all billed at the same rate.
+ */
+export type PayRunItemLine = PayRunLineBase & {
+  billAs: "item";
+  /** What one shift on this line was billed at. */
   rate: number;
   /**
    * The Shift Charge every shift on this line was logged at. Named on the bill
@@ -28,14 +40,25 @@ export type PayRunLine = {
    * apart without doing the arithmetic.
    */
   hoursType: HoursType;
-  shiftCount: number;
-  amount: number;
 };
+
+/**
+ * An outside vendor's shifts, billed to an expense category. A category row
+ * carries an amount and no quantity or rate, so every shift a vendor worked at
+ * one property collapses onto a single line however differently each was quoted.
+ */
+export type PayRunCategoryLine = PayRunLineBase & {
+  billAs: "category";
+};
+
+export type PayRunLine = PayRunItemLine | PayRunCategoryLine;
 
 export type PayRunVendor = {
   technicianId: string;
   vendorName: string;
   kind: string;
+  /** How this person's whole bill is written: in-house as items, vendors as categories. */
+  billAs: PayRunLine["billAs"];
   lines: PayRunLine[];
   total: number;
   shiftCount: number;
@@ -107,8 +130,8 @@ export function groupPayRun(
   let unapprovedCount = 0;
   let alreadyBilledCount = 0;
 
-  // technician -> "property + rate" -> line
-  const grouped = new Map<string, Map<string, PayRunLine & { splitShifts: number }>>();
+  // technician -> line key -> line, with the split-shift tally kept alongside
+  const grouped = new Map<string, Map<string, { line: PayRunLine; splitShifts: number }>>();
 
   for (const shift of shifts) {
     if (shift.approval_status !== "approved") {
@@ -127,43 +150,58 @@ export function groupPayRun(
     const byProperty = grouped.get(shift.technician_id) ?? new Map();
     grouped.set(shift.technician_id, byProperty);
 
+    const billAs = billShiftAs(technicianById.get(shift.technician_id)?.kind);
+    const hoursType = asHoursType(shift.hours_type);
+
     /*
-     * Grouped by property AND Shift Charge. Each shift is one unit of the
-     * product, so a line carries Quantity x Rate — which only holds if every
-     * shift on it was billed at the same rate, and the charge is what changes
-     * the rate. A property worked at both Regular and x 2 therefore produces
-     * two lines rather than one line whose amount does not match its quantity
-     * times its rate.
+     * An outside vendor's line is keyed on the property alone: a category row
+     * carries only an amount, so differently quoted jobs at one property add up
+     * onto one line.
      *
-     * The rate is in the key as well, so a tier an admin changed partway
-     * through the period cannot put two different prices on one line either.
+     * An engineer's line also carries the Shift Charge and the rate, because an
+     * item row has to satisfy Quantity x Rate = Amount. A property worked at
+     * both Regular and x 2 therefore produces two lines rather than one whose
+     * amount contradicts its own quantity and rate, and a tier an admin
+     * re-priced partway through the period cannot put two prices on one line.
      *
      * Keyed on the property id so renaming a property keeps its shifts together.
      */
-    const hoursType = asHoursType(shift.hours_type);
-    const key = `${shift.property_id}|${hoursType}|${shift.billed_amount.toFixed(2)}`;
-    const line = byProperty.get(key) ?? {
-      propertyId: shift.property_id,
-      // The live name is what must match the QuickBooks customer; the stored
-      // label is the fallback if the property was renamed out from under us.
-      customerName: propertyNameById.get(shift.property_id) ?? shift.property_label,
-      rate: shift.billed_amount,
-      hoursType,
-      shiftCount: 0,
-      amount: 0,
-      splitShifts: 0,
-    };
+    const key =
+      billAs === "category"
+        ? shift.property_id
+        : `${shift.property_id}|${hoursType}|${shift.billed_amount.toFixed(2)}`;
 
-    line.shiftCount += 1;
-    line.amount = Math.round((line.amount + shift.billed_amount) * 100) / 100;
-    if (shift.property_id_2 !== null) line.splitShifts += 1;
-    byProperty.set(key, line);
+    let entry = byProperty.get(key);
+    if (entry === undefined) {
+      const base = {
+        propertyId: shift.property_id,
+        // The live name is what must match the QuickBooks customer; the stored
+        // label is the fallback if the property was renamed out from under us.
+        customerName: propertyNameById.get(shift.property_id) ?? shift.property_label,
+        shiftCount: 0,
+        amount: 0,
+      };
+      entry = {
+        line:
+          billAs === "item"
+            ? { ...base, billAs, rate: shift.billed_amount, hoursType }
+            : { ...base, billAs },
+        splitShifts: 0,
+      };
+      byProperty.set(key, entry);
+    }
+
+    entry.line.shiftCount += 1;
+    entry.line.amount = Math.round((entry.line.amount + shift.billed_amount) * 100) / 100;
+    if (shift.property_id_2 !== null) entry.splitShifts += 1;
   }
 
   const vendors: PayRunVendor[] = [...grouped.entries()]
     .map(([technicianId, byProperty]) => {
-      const lines = [...byProperty.values()].sort(
-        (a, b) => a.customerName.localeCompare(b.customerName) || b.rate - a.rate,
+      const entries = [...byProperty.values()].sort(
+        (a, b) =>
+          a.line.customerName.localeCompare(b.line.customerName) ||
+          lineRate(b.line) - lineRate(a.line),
       );
       const technician = technicianById.get(technicianId);
 
@@ -171,17 +209,11 @@ export function groupPayRun(
         technicianId,
         vendorName: technician?.name ?? "Unknown",
         kind: technician?.kind ?? "in_house",
-        lines: lines.map(({ propertyId, customerName, rate, hoursType, shiftCount, amount }) => ({
-          propertyId,
-          customerName,
-          rate,
-          hoursType,
-          shiftCount,
-          amount,
-        })),
-        total: Math.round(lines.reduce((sum, line) => sum + line.amount, 0) * 100) / 100,
-        shiftCount: lines.reduce((sum, line) => sum + line.shiftCount, 0),
-        splitShiftCount: lines.reduce((sum, line) => sum + line.splitShifts, 0),
+        billAs: billShiftAs(technician?.kind),
+        lines: entries.map((entry) => entry.line),
+        total: Math.round(entries.reduce((sum, e) => sum + e.line.amount, 0) * 100) / 100,
+        shiftCount: entries.reduce((sum, e) => sum + e.line.shiftCount, 0),
+        splitShiftCount: entries.reduce((sum, e) => sum + e.splitShifts, 0),
       };
     })
     .sort((a, b) => a.vendorName.localeCompare(b.vendorName));
@@ -196,6 +228,19 @@ export function groupPayRun(
     unapprovedCount,
     alreadyBilledCount,
   };
+}
+
+/**
+ * Which kind of bill line a person's shifts become. Outside vendors go to an
+ * expense category; in-house engineers are billed as a product.
+ */
+function billShiftAs(kind: string | undefined): PayRunLine["billAs"] {
+  return kind === "vendor" ? "category" : "item";
+}
+
+/** Sort key only: a category line has no rate, and there is one per property. */
+function lineRate(line: PayRunLine): number {
+  return line.billAs === "item" ? line.rate : 0;
 }
 
 /** Bill numbers must be unique per vendor for an importer to group lines correctly. */
