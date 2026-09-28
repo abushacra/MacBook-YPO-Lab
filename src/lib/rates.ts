@@ -1,7 +1,7 @@
 import { type HoursType } from "./constants";
 
 /**
- * What each Shift Charge does to an engineer's assigned rate. The rate an admin
+ * What each Service Call Charge does to an engineer's assigned rate. The rate an admin
  * sets is the price of one Regular shift; the premium tiers are multiples of it.
  */
 export const HOURS_TYPE_MULTIPLIERS: Record<HoursType, number> = {
@@ -11,7 +11,7 @@ export const HOURS_TYPE_MULTIPLIERS: Record<HoursType, number> = {
 };
 
 /**
- * Price one shift: the engineer's assigned rate times the Shift Charge it was
+ * Price one shift: the engineer's assigned rate times the Service Call Charge it was
  * logged at, rounded to the cent. Kept pure and separate from the save path so
  * the arithmetic can be tested without a database.
  */

@@ -1,7 +1,7 @@
 # Kapa Service Log
 
 A mobile-first app for Kapa Property Company. In-house maintenance engineers and
-outside vendors use it to log maintenance shifts as they finish them, and to submit
+outside vendors use it to log service calls as they finish them, and to submit
 credit card receipts against the property that should carry the expense.
 
 Built as a Next.js app on a Supabase Postgres database, with private storage
@@ -54,68 +54,68 @@ An in-house engineer can be tagged **Chief Engineer** in Admin → People. Other
 engineers and outside vendors are then placed under one chief with the
 **Reports to** picker.
 
-Every maintenance shift is saved as **Awaiting approval** and routed to the
+Every service call is saved as **Awaiting approval** and routed to the
 logger's chief. The chief sees a card on the Home screen with the count, and a
-**To approve** filter on the Shifts screen. Opening a shift gives them Approve or
+**To approve** filter on the Service Calls screen. Opening a service call gives them Approve or
 Send back, with an optional note that the engineer sees on the call.
 
 Rules the app holds to:
 
-- Only the chief a shift was routed to, or an admin, can review it.
-- A chief cannot approve their own work; their shifts go to their own chief.
-- An admin can sign off anything, including shifts they logged themselves, and
+- Only the chief a service call was routed to, or an admin, can review it.
+- A chief cannot approve their own work; their service calls go to their own chief.
+- An admin can sign off anything, including service calls they logged themselves, and
   can revise a decision already made. That is deliberate: an admin is the
-  backstop for shifts whose author has no chief, and for a correction.
+  backstop for service calls whose author has no chief, and for a correction.
 - Routing is snapshotted when the call is saved, so moving someone to a new
   chief never pulls work out of the old chief's queue.
-- Shifts logged by someone with no chief stay pending and are visible to admins,
+- Service calls logged by someone with no chief stay pending and are visible to admins,
   who can approve them.
 
 The database enforces the structure independently: only in-house engineers can
 be chiefs, a reporting line must point at an actual chief, nobody reports to
 themselves, and a chief cannot be untagged while people still report to them.
 
-### Deleting a shift
+### Deleting a service call
 
-An admin gets a **Delete shift** control at the bottom of any shift, behind a
-two-tap confirmation. It removes the shift and its photo and PDF rows, and
+An admin gets a **Delete service call** control at the bottom of any service call, behind a
+two-tap confirmation. It removes the service call and its photo and PDF rows, and
 clears those files out of storage through the Storage API — SQL cannot delete
 storage objects, so this is the only path that leaves nothing behind.
 
-A receipt logged against the shift is **kept and unlinked**, not deleted. It is
+A receipt logged against the service call is **kept and unlinked**, not deleted. It is
 a financial record assigned to a property and should not disappear because the
-shift it referenced did.
+service call it referenced did.
 
 ## Paying engineers
 
 Each in-house engineer has rate tiers set in **Admin → People**: three named by
 role (Chief Engineer, Building Engineer, Assistant Engineer) plus a custom one.
 Usually only the row matching that person's role carries a rate; the rest are
-left blank. One tier is marked active, and every shift that engineer logs
+left blank. One tier is marked active, and every service call that engineer logs
 is priced from it.
 
-**A tier is the price of one Regular shift.** The Shift Charge on the shift
-multiplies it: x 1.5 Shift pays one and a half times the tier, x 2 Shift pays
+**A tier is the price of one Regular service call.** The Service Call Charge on the service call
+multiplies it: x 1.5 Service Call pays one and a half times the tier, x 2 Service Call pays
 double. A $125 Building Engineer therefore earns $125, $187.50 or $250 depending
 on the charge. Products of an odd rate are rounded to the cent. Vendors are not
 multiplied — the amount a vendor types is the amount they agreed.
 
-**Rates are admin-only.** Engineers never see a rate on the shift form, in their
-history, or anywhere else — the amount is read from the database when the shift
+**Rates are admin-only.** Engineers never see a rate on the service call form, in their
+history, or anywhere else — the amount is read from the database when the service call
 is saved, so the rate itself cannot be seen or set from the form. The one thing
-an engineer chooses is the Shift Charge, and approval by their chief or an admin
+an engineer chooses is the Service Call Charge, and approval by their chief or an admin
 is what checks that claim. Admins see the
-amount on each shift plus a billable total for whatever filter is applied on
-the Shifts screen. Vendors see the amounts they quoted themselves, and nobody else's.
+amount on each service call plus a billable total for whatever filter is applied on
+the Service Calls screen. Vendors see the amounts they quoted themselves, and nobody else's.
 
 Amounts are snapshots. Re-pricing a tier, renaming it, or deleting it never
-alters shifts already logged, so what someone was paid last month stays what
+alters service calls already logged, so what someone was paid last month stays what
 they were paid.
 
 ## Alerts
 
 Admins and chiefs can switch on **push notifications** from a card on the Home
-screen — one tap, per device. When a maintenance shift or a receipt is saved,
+screen — one tap, per device. When a service call or a receipt is saved,
 every active admin plus the chief that work belongs to gets a notification;
 other chiefs are left out so nobody hears about another team's work, and the
 person who did the saving is not told about their own action.
@@ -128,7 +128,7 @@ Safari instead.
 
 Sending is best effort by design. A missing key, a blocked notification or a
 dead subscription is swallowed, so an alert failure can never stop an
-engineer's shift from saving. Subscriptions the browser has discarded are
+engineer's service call from saving. Subscriptions the browser has discarded are
 deleted when the push is rejected.
 
 Setup needs a VAPID key pair in the environment — see `.env.example`. Generate
@@ -140,10 +140,11 @@ node -e "console.log(require('web-push').generateVAPIDKeys())"
 
 ## Pay run — bills for QuickBooks Online
 
-**Admin → Pay run** turns logged work into vendor bills. Pick a date range, name
-what the lines post to, and the screen groups everything into **one bill per
-person, with a line per property** — so each line can be charged to the
-property's customer for reimbursement.
+**Admin → Pay run** turns logged work into vendor bills. Pick a date range and
+the screen groups everything into **one bill per person, with a line per
+property** — so each line can be charged to the property's customer for
+reimbursement. Nothing is typed: where the lines post is fixed, and the screen
+lists it above the bills.
 
 Download gives a CSV matching Intuit's `sample_bills_import` template exactly:
 the same nineteen headers, a UTF-8 BOM, CRLF endings and MM/DD/YYYY dates.
@@ -153,31 +154,41 @@ Number, which is how the importer groups lines onto one bill. Every line carries
 
 ### Two kinds of line
 
-Who logged the shift decides how it is billed. A person is all one or all the
+Who logged the service call decides how it is billed. A person is all one or all the
 other, so a bill never mixes the two.
 
-| | In-house engineer | Outside vendor |
-| --- | --- | --- |
-| `*Type` | `Item Details` | `Category Details` |
-| Posts to | the **product/service** | the **expense category** |
-| `Quantity` / `Rate` | shift count × per-shift rate | empty |
-| Lines per property | one per Shift Charge | always one |
+| | Engineer | Chief engineer | Outside vendor |
+| --- | --- | --- | --- |
+| `*Type` | `Item Details` | `Item Details` | `Category Details` |
+| Posts to | `Kapa Service Call - Tech` | `Kapa Service Call - Supervisor` | `Reimbursable Expenses` |
+| Column | `Product/Service` | `Product/Service` | `Category/Account` |
+| `Quantity` / `Rate` | call count × per-call rate | call count × per-call rate | empty |
+| Lines per property | one per Service Call Charge | one per Service Call Charge | always one |
+
+Every bill also carries `Limited - Kapa Capital` in `Location`, on the bill's
+first row, which is where the template puts bill-level fields.
+
+**The rate always comes from this app, not from QuickBooks.** An item row is
+written with both `Rate` and `Amount` filled in, which is what stops QuickBooks
+falling back to the item's own cost. So `Kapa Service Call - Tech` can sit in
+QuickBooks with any cost at all — what gets billed is the tier saved against that
+engineer in Admin → People, times the Service Call Charge on the call.
+
+The four names live in `src/lib/quickbooks.ts` — change one there and it applies
+to the next download. Nothing is stored against bills already exported.
 
 An item row has to satisfy Quantity × Rate = Amount, so **an engineer's property
-worked at more than one Shift Charge produces one line per charge**: two Regular
-shifts and one x 1.5 become a 2 × line and a 1 × line, each naming its charge in
+worked at more than one Service Call Charge produces one line per charge**: two Regular
+service calls and one x 1.5 become a 2 × line and a 1 × line, each naming its charge in
 `Description`. Splitting is what keeps a line's amount from contradicting its own
 quantity and rate; the bill total is identical either way, and a property worked
 at a single charge all period stays one line. The rate is in the grouping key as
 well as the charge, so a tier an admin re-priced partway through a period cannot
 put two prices on one line.
 
-A category row carries an amount and nothing else, so **a vendor's shifts at one
+A category row carries an amount and nothing else, so **a vendor's service calls at one
 property always collapse onto a single line** however differently each job was
 quoted.
-
-The run only asks for the names it needs: an all-engineer week needs no expense
-category, an all-vendor week needs no product.
 
 Native bill import needs **QuickBooks Online Advanced**.
 
@@ -188,10 +199,12 @@ there — the importer will not create them:
 
 - each person's name in Admin → People must match their **Vendor** in QuickBooks
 - each property's name must match its **Customer**
-- the **product/service** must exist under Products and services, and be set up
-  so it can be bought from a vendor — needed only if the run has in-house engineers
-- the **expense category** must be an account in your chart of accounts — needed
-  only if the run has outside vendors
+- **`Kapa Service Call - Tech`** and **`Kapa Service Call - Supervisor`** must
+  exist under Products and services, each set up so it can be bought from a
+  vendor. Their cost in QuickBooks does not matter — see above
+- **`Reimbursable Expenses`** must be an account in your chart of accounts
+- **`Limited - Kapa Capital`** must exist as a Location, which also means
+  location tracking has to be switched on
 - **Account and Settings → Expenses → Track expenses and items by customer**
   must be on, or bills have no Customer column at all
 
@@ -199,17 +212,17 @@ there — the importer will not create them:
 
 Each is counted and shown rather than dropped quietly:
 
-- shifts still **awaiting approval** — sign them off first
-- approved shifts with **no amount**, from an engineer with no rate set or a
+- service calls still **awaiting approval** — sign them off first
+- approved service calls with **no amount**, from an engineer with no rate set or a
   vendor who left it blank. Nobody gets paid for these, so they are worth chasing
-- shifts **already billed** on an earlier run
+- service calls **already billed** on an earlier run
 
-A shift covering two properties keeps its whole amount on the first property and
+A service call covering two properties keeps its whole amount on the first property and
 is flagged, rather than being split on a guess.
 
 ### Not paying twice
 
-**Mark this run as billed** stamps every shift in the window, so a later run
+**Mark this run as billed** stamps every service call in the window, so a later run
 over overlapping dates cannot pay the same work again. Do it once the import has
 actually succeeded.
 
@@ -229,17 +242,17 @@ the database, so deactivating someone takes effect immediately.
 
 ## What gets logged
 
-**Maintenance shift** — date, Shift Charge (Regular, x 1.5 Shift or
-x 2 Shift), shift type (emergency or scheduled), and property are required. Space, a description of the work, a
+**Service call** — date, Service Call Charge (Regular, x 1.5 Service Call or
+x 2 Service Call), call type (emergency or scheduled), and property are required. Space, a description of the work, a
 follow-up flag with notes, and up to eight photos or PDFs are optional.
 
-A shift can cover **two properties**, for an engineer who works both in one day:
-ticking "This shift covers a second property" adds a second property and space.
-The two must be different, and filtering by a property finds shifts where it is
+A service call can cover **two properties**, for an engineer who works both in one day:
+ticking "This service call covers a second property" adds a second property and space.
+The two must be different, and filtering by a property finds service calls where it is
 either the first or the second.
 
 An outside vendor also gets an optional **amount they are charging** for the
-job. An in-house engineer gets no money field at all: their shifts are priced
+job. An in-house engineer gets no money field at all: their service calls are priced
 automatically from the rate an admin set for them.
 
 Space can be tapped from the property's list, typed free-hand, or left blank
@@ -251,7 +264,7 @@ record; anything else is stored as a one-off label.
 Receipts tab is hidden from everyone else. Amount, date, and the property to
 charge are required.
 A receipt image or PDF, store, category, notes, and a link to a related
-maintenance shift are optional.
+service call are optional.
 
 Attachments offer two buttons: **Take photo** opens the camera straight away,
 and **Choose file** opens the phone's photo library and file browser, so a shot
@@ -286,12 +299,12 @@ global sign-out if a phone is lost.
 | `spaces` | Units, suites, and common areas within a property. Suggestions, not a closed list. |
 | `technicians` | In-house engineers and outside vendors, with PIN hash, admin and chief flags, and who they report to. |
 | `technician_rates` | Per-engineer billing tiers. Exactly one is the active rate. |
-| `service_calls` | One row per logged maintenance shift, covering one or two properties, with its approval state. |
-| `service_call_photos` | Storage paths of the photos and PDFs attached to a shift. |
+| `service_calls` | One row per logged service call, covering one or two properties, with its approval state. |
+| `service_call_photos` | Storage paths of the photos and PDFs attached to a service call. |
 | `expenses` | Credit card charges, each assigned to a property. |
 | `push_subscriptions` | One row per device signed up for alerts, keyed by the browser's endpoint. |
 
-Shifts and expenses store a `property_label` / `space_label` snapshot
+Service calls and expenses store a `property_label` / `space_label` snapshot
 alongside the foreign key, so renaming or retiring a property never rewrites
 history.
 
@@ -327,9 +340,18 @@ npx eslint .     # lint
 
 ## Naming
 
-The feature engineers use is called a **Maintenance Shift**. The database
-tables are still named `service_calls` and `service_call_photos`, and the URLs
-are still `/calls` — renaming either would break links people have already
-saved to their phone home screen and would rewrite rows for no functional gain.
-The stored `hours_type` values likewise keep their original spelling, so
-`after_hours` is the **x 1.5 Shift** tier.
+The thing engineers and vendors log is a **Service Call**. It was briefly called
+a Maintenance Shift, so some internal names still say "shift":
+
+- `PayRunShift`, `shiftCount`, `splitShiftCount`, `shiftRate` and a number of
+  code comments. These are internal identifiers with no user-visible effect, and
+  renaming them on a live app is churn with no functional gain.
+- The stored `hours_type` values keep their original spelling, so `after_hours`
+  is the **x 1.5 Service Call** tier and `double_time` is **x 2 Service Call**.
+  Renaming them would mean rewriting rows already logged.
+
+The tables (`service_calls`, `service_call_photos`) and the URLs (`/calls`) were
+never renamed, so those now match the user-facing name again.
+
+If any of this is renamed later, do the stored `hours_type` values last and with
+a migration — everything else is a pure find-and-replace.

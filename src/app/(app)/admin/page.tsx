@@ -141,7 +141,7 @@ async function PropertiesTab() {
 
                   {inUse ? (
                     <p className="mt-2 text-xs text-muted">
-                      {countLabel(used.calls, "maintenance shift")} and{" "}
+                      {countLabel(used.calls, "service call")} and{" "}
                       {countLabel(used.expenses, "receipt")} logged here, so this property
                       can&apos;t be deleted. Retire it to take it off the forms.
                     </p>
@@ -153,7 +153,7 @@ async function PropertiesTab() {
 
                   {!property.active && (
                     <p className="mt-2 text-xs font-semibold text-amber-800">
-                      Retired — hidden from new shifts and receipts.
+                      Retired — hidden from new service calls and receipts.
                     </p>
                   )}
 

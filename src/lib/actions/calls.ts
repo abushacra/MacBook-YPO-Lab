@@ -22,7 +22,7 @@ const MAX_SPACE_LENGTH = 120;
 
 const schema = z.object({
   call_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date of the call."),
-  hours_type: z.enum(HOURS_TYPES, { message: "Choose a Shift Charge." }),
+  hours_type: z.enum(HOURS_TYPES, { message: "Choose a Service Call Charge." }),
   call_type: z.enum(CALL_TYPES, { message: "Choose emergency or scheduled." }),
   property_id: z.uuid("Choose a property."),
   space: z.string().max(MAX_SPACE_LENGTH, "That space name is too long."),
@@ -135,7 +135,7 @@ export async function createServiceCall(
   if (user.kind === "in_house") {
     // Priced from the tier an admin marked active for this engineer. The rate
     // itself never comes from the form, so an engineer cannot see it or set it;
-    // the one thing they choose is the Shift Charge, and the chief or admin
+    // the one thing they choose is the Service Call Charge, and the chief or admin
     // approving the shift is what checks that claim.
     const { data: rate } = await db()
       .from("technician_rates")
@@ -145,7 +145,7 @@ export async function createServiceCall(
       .maybeSingle();
 
     if (rate) {
-      // The assigned rate is the price of one Regular shift; the Shift Charge
+      // The assigned rate is the price of one Regular shift; the Service Call Charge
       // the engineer picked multiplies it (x 1.5, x 2).
       rateId = rate.id;
       billedLabel = shiftRateLabel(rate.label, input.hours_type);
@@ -197,7 +197,7 @@ export async function createServiceCall(
     .single();
 
   if (error || !created) {
-    return { error: "Could not save the maintenance shift. Check your signal and try again." };
+    return { error: "Could not save the service call. Check your signal and try again." };
   }
 
   const photos = storagePaths(formData, "photos");
@@ -208,7 +208,7 @@ export async function createServiceCall(
   }
 
   await alertOversight({
-    title: "Maintenance shift logged",
+    title: "Service call logged",
     body: `${user.name} · ${primary.propertyLabel}${
       primary.spaceLabel ? ` · ${primary.spaceLabel}` : ""
     }`,
@@ -279,7 +279,7 @@ export async function reviewServiceCall(formData: FormData): Promise<void> {
 }
 
 /**
- * Removes a maintenance shift outright, admin only.
+ * Removes a service call outright, admin only.
  *
  * The shift's photo and PDF rows cascade with it, and their files are taken out
  * of storage here — Supabase refuses storage deletes from SQL, so the Storage

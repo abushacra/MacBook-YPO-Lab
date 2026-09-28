@@ -16,7 +16,7 @@ export function BottomNav({
 
   const items: Item[] = [
     { href: "/", label: "Home", icon: "home" },
-    { href: "/calls", label: "Shifts", icon: "clipboard" },
+    { href: "/calls", label: "Service Calls", icon: "clipboard" },
     ...(showReceipts
       ? [{ href: "/expenses", label: "Receipts", icon: "receipt" } as const]
       : []),
@@ -38,7 +38,7 @@ export function BottomNav({
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold ${
+                className={`flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-center text-xs leading-tight font-semibold ${
                   active ? "text-brand-700" : "text-muted"
                 }`}
               >

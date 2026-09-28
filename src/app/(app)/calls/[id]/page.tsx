@@ -13,7 +13,7 @@ import { ApprovalBadge, CallTypeBadge, HoursBadge } from "@/components/call-badg
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 
-export const metadata = { title: "Maintenance shift · Kapa Service Log" };
+export const metadata = { title: "Service call · Kapa Service Log" };
 
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -68,13 +68,13 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
           role="status"
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
         >
-          Maintenance shift saved.
+          Service call saved.
         </p>
       )}
 
       <div>
         <Link href="/calls" className="text-sm font-semibold text-brand-700">
-          ← All shifts
+          ← All service calls
         </Link>
         <h1 className="mt-2 text-xl font-bold">{call.property_label}</h1>
         {call.space_label && <p className="text-base text-muted">{call.space_label}</p>}
@@ -113,7 +113,7 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
           </p>
           {call.technician_id === user.id && (
             <p className="text-xs text-muted">
-              This is your own shift. You can sign it off because you are an admin.
+              This is your own service call. You can sign it off because you are an admin.
             </p>
           )}
           <textarea
@@ -199,7 +199,7 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
                       // eslint-disable-next-line @next/next/no-img-element -- served via a short-lived signed URL, not optimizable
                       <img
                         src={href}
-                        alt="Maintenance shift photo"
+                        alt="Service call photo"
                         loading="lazy"
                         className="aspect-square w-full rounded-xl border border-hairline object-cover"
                       />
@@ -214,19 +214,19 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
 
       {user.is_admin && (
         <section className="rounded-2xl border border-red-200 bg-red-50 p-4">
-          <h2 className="text-sm font-bold text-red-900">Delete this shift</h2>
+          <h2 className="text-sm font-bold text-red-900">Delete this service call</h2>
           <p className="mt-1 text-xs text-red-800">
-            Removes the shift and its photos and files for good. A receipt logged
+            Removes the service call and its photos and files for good. A receipt logged
             against it is kept and simply unlinked.
           </p>
           <form action={deleteServiceCall} className="mt-3">
             <input type="hidden" name="id" value={call.id} />
             <ConfirmButton
-              confirmLabel="Tap again to delete this shift"
+              confirmLabel="Tap again to delete this service call"
               className="btn-danger w-full"
               confirmClassName="btn w-full bg-red-600 text-white hover:bg-red-700"
             >
-              Delete shift
+              Delete service call
             </ConfirmButton>
           </form>
         </section>
@@ -234,7 +234,7 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
 
       {expenses && expenses.length > 0 && (
         <section>
-          <h2 className="section-heading mb-2">Charges on this shift</h2>
+          <h2 className="section-heading mb-2">Charges on this service call</h2>
           <ul className="card divide-y divide-hairline">
             {expenses.map((expense) => (
               <li key={expense.id} className="flex items-center justify-between gap-3 px-4 py-3">

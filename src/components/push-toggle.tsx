@@ -159,7 +159,7 @@ export function PushToggle() {
           {state === "on" ? "Alerts are on for this device" : "Alerts are off"}
         </p>
         <p className="text-xs text-muted">
-          {error ?? "Get a notification when a shift or receipt is saved."}
+          {error ?? "Get a notification when a service call or receipt is saved."}
         </p>
       </div>
       <button

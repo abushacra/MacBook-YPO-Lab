@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/supabase";
 import { asHoursType, type HoursType } from "@/lib/constants";
+import { billTarget } from "@/lib/quickbooks";
 
 /**
  * Builds a pay run: one vendor bill per person for the chosen dates, with one
@@ -35,7 +36,7 @@ export type PayRunItemLine = PayRunLineBase & {
   /** What one shift on this line was billed at. */
   rate: number;
   /**
-   * The Shift Charge every shift on this line was logged at. Named on the bill
+   * The Service Call Charge every shift on this line was logged at. Named on the bill
    * line so a Regular line and an x 2 line at the same property can be told
    * apart without doing the arithmetic.
    */
@@ -59,6 +60,11 @@ export type PayRunVendor = {
   kind: string;
   /** How this person's whole bill is written: in-house as items, vendors as categories. */
   billAs: PayRunLine["billAs"];
+  /**
+   * The QuickBooks name every line on this bill posts to — the product/service
+   * for an item bill, the expense account for a category one.
+   */
+  billTarget: string;
   lines: PayRunLine[];
   total: number;
   shiftCount: number;
@@ -99,7 +105,7 @@ export async function buildPayRun(from: string, to: string): Promise<PayRun> {
       )
       .gte("call_date", from)
       .lte("call_date", to),
-    db().from("technicians").select("id, name, kind"),
+    db().from("technicians").select("id, name, kind, is_chief"),
     db().from("properties").select("id, name"),
   ]);
 
@@ -120,7 +126,7 @@ export function groupPayRun(
   from: string,
   to: string,
   shifts: PayRunShift[],
-  technicians: { id: string; name: string; kind: string }[],
+  technicians: { id: string; name: string; kind: string; is_chief: boolean }[],
   properties: { id: string; name: string }[],
 ): PayRun {
   const technicianById = new Map(technicians.map((row) => [row.id, row]));
@@ -158,7 +164,7 @@ export function groupPayRun(
      * carries only an amount, so differently quoted jobs at one property add up
      * onto one line.
      *
-     * An engineer's line also carries the Shift Charge and the rate, because an
+     * An engineer's line also carries the Service Call Charge and the rate, because an
      * item row has to satisfy Quantity x Rate = Amount. A property worked at
      * both Regular and x 2 therefore produces two lines rather than one whose
      * amount contradicts its own quantity and rate, and a tier an admin
@@ -210,6 +216,7 @@ export function groupPayRun(
         vendorName: technician?.name ?? "Unknown",
         kind: technician?.kind ?? "in_house",
         billAs: billShiftAs(technician?.kind),
+        billTarget: billTarget(technician?.kind ?? "in_house", technician?.is_chief ?? false),
         lines: entries.map((entry) => entry.line),
         total: Math.round(entries.reduce((sum, e) => sum + e.line.amount, 0) * 100) / 100,
         shiftCount: entries.reduce((sum, e) => sum + e.line.shiftCount, 0),

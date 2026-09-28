@@ -7,7 +7,7 @@ export type RateRow = { label: string; amount: number; isPrimary?: boolean };
 /**
  * Admin-only. Engineers never see their rates: one tier is marked active here
  * and every shift that engineer logs is priced from it automatically. The amount
- * entered is one Regular shift; the Shift Charge on the shift multiplies it.
+ * entered is one Regular shift; the Service Call Charge on the shift multiplies it.
  *
  * Three standard slots come pre-filled with role labels, plus a custom one.
  * Labels are editable — nothing in the app matches on the text.
@@ -22,14 +22,14 @@ export function RateRows({ rates = [] }: { rates?: RateRow[] }) {
     <div className="space-y-3">
       <p className="text-xs text-muted">
         Fill in the tier that matches this engineer&apos;s role and mark it
-        active. Leave the rest blank. Enter what one Regular shift is worth — a
-        shift logged as x 1.5 or x 2 is priced at that multiple automatically.
+        active. Leave the rest blank. Enter what one Regular service call is worth —
+        a call logged as x 1.5 or x 2 is priced at that multiple automatically.
       </p>
 
       <div className="flex items-center gap-2 px-1 text-[11px] font-bold tracking-wide text-muted uppercase">
         <span className="w-10 shrink-0 text-center">Use</span>
         <span className="min-w-0 flex-1">Tier</span>
-        <span className="w-28 shrink-0">Per shift</span>
+        <span className="w-28 shrink-0">Per call</span>
       </div>
 
       {Array.from({ length: RATE_SLOTS }, (_, slot) => {
@@ -86,7 +86,7 @@ export function RateRows({ rates = [] }: { rates?: RateRow[] }) {
       })}
 
       <p className="text-xs text-muted">
-        Changing a rate later never alters shifts already logged — each one keeps
+        Changing a rate later never alters calls already logged — each one keeps
         the amount it was saved with.
       </p>
     </div>

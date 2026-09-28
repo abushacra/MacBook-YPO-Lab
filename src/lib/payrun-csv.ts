@@ -1,6 +1,7 @@
 import type { PayRun } from "@/lib/payrun";
 import { billNumber } from "@/lib/payrun";
 import { HOURS_TYPE_LABELS } from "@/lib/constants";
+import { BILL_LOCATION } from "@/lib/quickbooks";
 
 /**
  * Renders a pay run as a QuickBooks Online bill-import CSV.
@@ -11,9 +12,11 @@ import { HOURS_TYPE_LABELS } from "@/lib/constants";
  * Bill Number leave them blank, which is how the importer groups lines onto one
  * bill.
  *
- * An in-house engineer's lines are "Item Details" rows: one shift is one unit of
- * the product, so Quantity is the shift count, Rate is what a shift was billed
- * at, and the Description names the Shift Charge behind that rate.
+ * An in-house engineer's lines are "Item Details" rows: one service call is one
+ * unit of the product, so Quantity is the call count, Rate is what a call was
+ * billed at, and the Description names the Service Call Charge behind that rate. Writing Rate
+ * and Amount on the row is what makes QuickBooks bill at the rate saved in this
+ * app rather than the item's own cost.
  *
  * An outside vendor's lines are "Category Details" rows posted to an expense
  * category. A category row carries an amount with no quantity or rate, so a
@@ -56,16 +59,8 @@ export function usDate(iso: string): string {
   return `${month}/${day}/${year}`;
 }
 
-/** What each kind of line is posted to in QuickBooks. Both are names, not ids. */
-export type BillTargets = {
-  /** The product/service an engineer's shifts are billed as. */
-  productService: string;
-  /** The expense category an outside vendor's shifts are posted to. */
-  expenseCategory: string;
-};
-
-export function payRunCsv(payRun: PayRun, targets: BillTargets): string {
-  const memo = `Maintenance shifts ${usDate(payRun.from)} to ${usDate(payRun.to)}`;
+export function payRunCsv(payRun: PayRun): string {
+  const memo = `Service calls ${usDate(payRun.from)} to ${usDate(payRun.to)}`;
   const period = `${usDate(payRun.from)} to ${usDate(payRun.to)}`;
   const rows: string[] = [BILL_CSV_HEADERS.map(csvCell).join(",")];
 
@@ -74,26 +69,31 @@ export function payRunCsv(payRun: PayRun, targets: BillTargets): string {
 
     vendor.lines.forEach((line, lineIndex) => {
       const first = lineIndex === 0;
-      const shifts = `${line.shiftCount} shift${line.shiftCount === 1 ? "" : "s"}`;
+      const calls = `${line.shiftCount} service call${line.shiftCount === 1 ? "" : "s"}`;
 
-      // An item row prices each shift; a category row only carries the total.
+      /*
+       * An item row prices each call, so it carries the product, the quantity
+       * and the rate. A category row carries only the account and the total.
+       * Either way the name comes from the bill's own target, which is decided by
+       * who the person is rather than typed at download time.
+       */
       const detail =
         line.billAs === "item"
           ? {
               type: "Item Details",
               categoryAccount: "",
-              productService: targets.productService,
+              productService: vendor.billTarget,
               quantity: String(line.shiftCount),
               rate: line.rate.toFixed(2),
-              description: `${shifts} at ${line.rate.toFixed(2)} \u00b7 ${HOURS_TYPE_LABELS[line.hoursType]} \u2014 ${period}`,
+              description: `${calls} at ${line.rate.toFixed(2)} \u00b7 ${HOURS_TYPE_LABELS[line.hoursType]} \u2014 ${period}`,
             }
           : {
               type: "Category Details",
-              categoryAccount: targets.expenseCategory,
+              categoryAccount: vendor.billTarget,
               productService: "",
               quantity: "",
               rate: "",
-              description: `${shifts} \u2014 ${period}`,
+              description: `${calls} \u2014 ${period}`,
             };
 
       rows.push(
@@ -104,7 +104,9 @@ export function payRunCsv(payRun: PayRun, targets: BillTargets): string {
           "", // Terms — left to the vendor's own terms
           first ? usDate(payRun.to) : "",
           "", // Due Date — derived from those terms
-          "", // Location
+          // Location is a bill-level field, so it sits on the first row and
+          // covers every line on that bill.
+          first ? BILL_LOCATION : "",
           first ? memo : "",
           detail.type,
           detail.categoryAccount,

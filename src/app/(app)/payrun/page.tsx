@@ -6,6 +6,12 @@ import { markPayRunBilled } from "@/lib/actions/payrun";
 import { formatDate, formatMoney, todayISO } from "@/lib/format";
 import { ConfirmButton } from "@/components/confirm-button";
 import { HOURS_TYPE_LABELS } from "@/lib/constants";
+import {
+  BILL_LOCATION,
+  CHIEF_ITEM,
+  ENGINEER_ITEM,
+  VENDOR_EXPENSE_CATEGORY,
+} from "@/lib/quickbooks";
 
 export const metadata = { title: "Pay run · Kapa Service Log" };
 
@@ -26,6 +32,15 @@ function defaultRange(): { from: string; to: string } {
   return { from, to };
 }
 
+function MapRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="shrink-0 text-muted">{label}</dt>
+      <dd className="min-w-0 text-right font-semibold">{value}</dd>
+    </div>
+  );
+}
+
 export default async function PayRunPage({ searchParams }: PageProps<"/payrun">) {
   await requireAdmin();
   const params = await searchParams;
@@ -33,23 +48,9 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
   const fallback = defaultRange();
   const from = isDate(one(params.from)) ? one(params.from) : fallback.from;
   const to = isDate(one(params.to)) ? one(params.to) : fallback.to;
-  const item = one(params.item);
-  const category = one(params.category);
-
   const payRun = await buildPayRun(from, to);
 
-  // An engineer's shifts become product lines and a vendor's become expense
-  // category lines, so a run only needs the name for the kinds it actually has.
-  const needsItem = payRun.vendors.some((vendor) => vendor.billAs === "item");
-  const needsCategory = payRun.vendors.some((vendor) => vendor.billAs === "category");
-  const missing = [
-    needsItem && !item ? "the product / service" : null,
-    needsCategory && !category ? "the expense category" : null,
-  ].filter((label): label is string => label !== null);
-
-  const csvHref = `/api/payrun?from=${from}&to=${to}${
-    item ? `&item=${encodeURIComponent(item)}` : ""
-  }${category ? `&category=${encodeURIComponent(category)}` : ""}`;
+  const csvHref = `/api/payrun?from=${from}&to=${to}`;
 
   return (
     <div className="space-y-5">
@@ -80,44 +81,6 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
           </div>
         </div>
 
-        <div>
-          <label className="field-label" htmlFor="item">
-            Product / service
-          </label>
-          <input
-            id="item"
-            name="item"
-            type="text"
-            defaultValue={item}
-            placeholder="e.g. Maintenance Shift"
-            className="input"
-          />
-          <p className="field-hint">
-            For in-house engineers. Goes in the Product/Service column and must
-            already exist in QuickBooks. Each shift counts as one of them, so
-            Quantity &times; Rate is the line amount.
-          </p>
-        </div>
-
-        <div>
-          <label className="field-label" htmlFor="category">
-            Expense category
-          </label>
-          <input
-            id="category"
-            name="category"
-            type="text"
-            defaultValue={category}
-            placeholder="e.g. Repairs &amp; Maintenance"
-            className="input"
-          />
-          <p className="field-hint">
-            For outside vendors. Goes in the Category/Account column and must
-            match an account in your chart of accounts. A vendor&apos;s whole
-            total for a property sits on one line.
-          </p>
-        </div>
-
         <button type="submit" className="btn-primary w-full">
           Show pay run
         </button>
@@ -129,7 +92,7 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
             {formatDate(from, { weekday: undefined })} – {formatDate(to, { weekday: undefined })}
           </p>
           <p className="text-xs text-muted">
-            {payRun.shiftCount} shift{payRun.shiftCount === 1 ? "" : "s"} ·{" "}
+            {payRun.shiftCount} service call{payRun.shiftCount === 1 ? "" : "s"} ·{" "}
             {payRun.vendors.length} bill{payRun.vendors.length === 1 ? "" : "s"}
           </p>
         </div>
@@ -144,7 +107,8 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
           <ul className="mt-2 space-y-1">
             {payRun.unapprovedCount > 0 && (
               <li>
-                {payRun.unapprovedCount} shift{payRun.unapprovedCount === 1 ? "" : "s"} still
+                {payRun.unapprovedCount} service call
+                {payRun.unapprovedCount === 1 ? "" : "s"} still
                 awaiting approval.{" "}
                 <Link href="/calls?scope=to_approve" className="font-semibold underline">
                   Review them
@@ -154,14 +118,14 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
             )}
             {payRun.unpricedCount > 0 && (
               <li>
-                {payRun.unpricedCount} approved shift
+                {payRun.unpricedCount} approved service call
                 {payRun.unpricedCount === 1 ? "" : "s"} with no amount — an engineer with no
                 rate set, or a vendor who left the amount blank. Nobody gets paid for these.
               </li>
             )}
             {payRun.alreadyBilledCount > 0 && (
               <li>
-                {payRun.alreadyBilledCount} shift
+                {payRun.alreadyBilledCount} service call
                 {payRun.alreadyBilledCount === 1 ? "" : "s"} already billed on an earlier run.
               </li>
             )}
@@ -175,18 +139,24 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
         </p>
       ) : (
         <>
-          {missing.length === 0 ? (
-            <a href={csvHref} className="btn-primary w-full">
-              Download bills CSV for QuickBooks
-            </a>
-          ) : (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-              Name {missing.join(" and ")} above to enable the download — this run
-              has {needsItem && needsCategory ? "both engineer and vendor bills" : null}
-              {needsItem && !needsCategory ? "engineer bills, billed as items" : null}
-              {needsCategory && !needsItem ? "vendor bills, posted to a category" : null}.
+          <a href={csvHref} className="btn-primary w-full">
+            Download bills CSV for QuickBooks
+          </a>
+
+          <section className="card p-4 text-sm">
+            <h2 className="section-heading">Where these post in QuickBooks</h2>
+            <dl className="mt-2 space-y-1 text-xs">
+              <MapRow label="Location, every bill" value={BILL_LOCATION} />
+              <MapRow label="Engineers" value={ENGINEER_ITEM} />
+              <MapRow label="Chief engineers" value={CHIEF_ITEM} />
+              <MapRow label="Outside vendors" value={VENDOR_EXPENSE_CATEGORY} />
+            </dl>
+            <p className="mt-3 text-xs text-muted">
+              Each name must already exist in QuickBooks. Engineer lines carry the
+              rate saved here, so the item&apos;s own cost in QuickBooks is not
+              used.
             </p>
-          )}
+          </section>
 
           <ul className="space-y-3">
             {payRun.vendors.map((vendor, index) => (
@@ -195,9 +165,11 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                   <div className="min-w-0">
                     <p className="truncate font-bold">{vendor.vendorName}</p>
                     <p className="text-xs text-muted">
-                      Bill {billNumber(to, index)} · {vendor.shiftCount} shift
-                      {vendor.shiftCount === 1 ? "" : "s"} ·{" "}
-                      {vendor.billAs === "item" ? "billed as items" : "expense category"}
+                      Bill {billNumber(to, index)} · {vendor.shiftCount} service call
+                      {vendor.shiftCount === 1 ? "" : "s"}
+                    </p>
+                    <p className="truncate text-xs text-muted">
+                      {vendor.billAs === "item" ? "Item" : "Category"}: {vendor.billTarget}
                     </p>
                   </div>
                   <p className="shrink-0 text-lg font-bold">{formatMoney(vendor.total)}</p>
@@ -251,7 +223,7 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
           <section className="rounded-2xl border border-hairline bg-white p-4">
             <h2 className="text-sm font-bold">Once the bills are in QuickBooks</h2>
             <p className="mt-1 text-xs text-muted">
-              Marking this run billed stops these {payRun.shiftCount} shift
+              Marking this run billed stops these {payRun.shiftCount} service call
               {payRun.shiftCount === 1 ? "" : "s"} appearing in a later run, so nobody is paid
               twice. Do it after the import succeeds, not before.
             </p>
