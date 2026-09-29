@@ -14,9 +14,14 @@ import { Segmented } from "@/components/segmented";
 import { MediaUploader } from "@/components/media-uploader";
 import { SubmitButton } from "@/components/submit-button";
 
+/** Someone an admin or chief may log a call for. */
+export type CallSubjectOption = { id: string; name: string; isVendor: boolean };
+
 export function ServiceCallForm({
   properties,
   isVendor,
+  subjects,
+  selfId,
   serverToday,
 }: {
   properties: PropertyOption[];
@@ -26,9 +31,24 @@ export function ServiceCallForm({
    * shown or editable here.
    */
   isVendor: boolean;
+  /**
+   * Everyone the signed-in person may log for, themselves included. Empty for an
+   * ordinary engineer, who can only log their own work and so needs no picker.
+   */
+  subjects: CallSubjectOption[];
+  selfId: string;
   serverToday: string;
 }) {
   const [state, formAction] = useActionState(createServiceCall, EMPTY_FORM_STATE);
+  const [subjectId, setSubjectId] = useState(selfId);
+
+  /*
+   * The amount field belongs to whoever the call is FOR, not whoever is typing:
+   * an admin logging for an outside vendor still needs to enter that vendor's
+   * agreed price, and logging for an engineer must not offer one.
+   */
+  const subject = subjects.find((person) => person.id === subjectId);
+  const amountApplies = subjects.length > 0 ? (subject?.isVendor ?? false) : isVendor;
   const [propertyId, setPropertyId] = useState(properties.length === 1 ? properties[0].id : "");
   const [space, setSpace] = useState("");
   const [showSecond, setShowSecond] = useState(false);
@@ -50,6 +70,30 @@ export function ServiceCallForm({
 
   return (
     <form action={formAction} className="space-y-6">
+      {subjects.length > 0 && (
+        <Field
+          label="Logged for"
+          htmlFor="technician_id"
+          required
+          error={errors.technician_id}
+          hint="Whose service call this is. It is priced at their rate and goes to their chief for approval."
+        >
+          <select
+            id="technician_id"
+            name="technician_id"
+            value={subjectId}
+            onChange={(event) => setSubjectId(event.target.value)}
+            className="input"
+          >
+            {subjects.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.id === selfId ? `${person.name} (you)` : person.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
       <Field label="Date" htmlFor="call_date" required error={errors.call_date}>
         <input
           ref={dateRef}
@@ -146,9 +190,13 @@ export function ServiceCallForm({
         />
       </Field>
 
-      {isVendor ? (
+      {amountApplies ? (
         <Field
-          label="Amount you are charging"
+          label={
+            subject && subject.id !== selfId
+              ? `Amount ${subject.name} is charging`
+              : "Amount you are charging"
+          }
           htmlFor="billed_amount"
           error={errors.billed_amount}
           hint="The agreed price for this work. Leave blank if it is covered another way."

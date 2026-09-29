@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requireAdmin, requireUser, type CurrentUser } from "@/lib/auth";
+import type { Tables } from "@/lib/database.types";
 import { PHOTO_BUCKET, db } from "@/lib/supabase";
 import { alertOversight } from "@/lib/push";
 import { CALL_TYPES, HOURS_TYPES } from "@/lib/constants";
@@ -77,6 +78,50 @@ async function resolveLocation(
   return { propertyId: property.id, propertyLabel: property.name, spaceId, spaceLabel };
 }
 
+/**
+ * Who a call is being logged for, and whether the signed-in person may do it.
+ *
+ * Most calls are someone logging their own work. An admin may log for anyone
+ * active; a chief may log for themselves or anyone on their own team. The
+ * subject is what decides the rate, the routing and whether an amount field
+ * applies — the person typing only decides whether it is allowed at all.
+ */
+type CallSubject = Pick<
+  Tables<"technicians">,
+  "id" | "kind" | "chief_id" | "is_chief" | "name"
+>;
+
+async function resolveSubject(
+  user: CurrentUser,
+  requestedId: string,
+): Promise<CallSubject | null> {
+  if (!requestedId || requestedId === user.id) {
+    return {
+      id: user.id,
+      kind: user.kind,
+      chief_id: user.chief_id,
+      is_chief: user.is_chief,
+      name: user.name,
+    };
+  }
+
+  if (!user.is_admin && !user.is_chief) return null;
+  if (!z.uuid().safeParse(requestedId).success) return null;
+
+  const { data: subject } = await db()
+    .from("technicians")
+    .select("id, kind, chief_id, is_chief, name, active")
+    .eq("id", requestedId)
+    .maybeSingle();
+
+  if (!subject || !subject.active) return null;
+
+  // A chief is confined to their own team; an admin is not.
+  if (!user.is_admin && subject.chief_id !== user.id) return null;
+
+  return subject;
+}
+
 export async function createServiceCall(
   _prev: FormState,
   formData: FormData,
@@ -102,6 +147,15 @@ export async function createServiceCall(
 
   const input = parsed.data;
 
+  const subject = await resolveSubject(user, text(formData, "technician_id"));
+  if (!subject) {
+    return {
+      error: "You cannot log a service call for that person.",
+      fieldErrors: { technician_id: "Pick someone else." },
+    };
+  }
+  const onBehalf = subject.id !== user.id;
+
   const primary = await resolveLocation(input.property_id, input.space);
   if (!primary) {
     return { error: "That property no longer exists.", fieldErrors: { property_id: "Pick again." } };
@@ -126,13 +180,15 @@ export async function createServiceCall(
     }
   }
 
-  // What the call is worth, resolved by who is logging it: an admin-set rate
-  // for in-house engineers, the amount they agreed for vendors.
+  // What the call is worth, resolved by whose work it is: an admin-set rate for
+  // in-house engineers, the amount agreed for vendors. When an admin or chief
+  // logs on someone's behalf it is still that person's rate that applies, never
+  // the rate of whoever happens to be typing.
   let rateId: string | null = null;
   let billedLabel: string | null = null;
   let billedAmount: number | null = null;
 
-  if (user.kind === "in_house") {
+  if (subject.kind === "in_house") {
     // Priced from the tier an admin marked active for this engineer. The rate
     // itself never comes from the form, so an engineer cannot see it or set it;
     // the one thing they choose is the Service Call Charge, and the chief or admin
@@ -140,7 +196,7 @@ export async function createServiceCall(
     const { data: rate } = await db()
       .from("technician_rates")
       .select("id, label, amount")
-      .eq("technician_id", user.id)
+      .eq("technician_id", subject.id)
       .eq("is_primary", true)
       .maybeSingle();
 
@@ -171,7 +227,8 @@ export async function createServiceCall(
   const { data: created, error } = await db()
     .from("service_calls")
     .insert({
-      technician_id: user.id,
+      technician_id: subject.id,
+      entered_by: onBehalf ? user.id : null,
       call_date: input.call_date,
       hours_type: input.hours_type,
       call_type: input.call_type,
@@ -186,9 +243,11 @@ export async function createServiceCall(
       rate_id: rateId,
       billed_label: billedLabel,
       billed_amount: billedAmount,
-      // Snapshotted so moving someone to a new chief later never pulls work
-      // out of the old chief's queue.
-      routed_to_chief_id: user.chief_id,
+      // The subject's chief, not the typist's: a call logged for an engineer
+      // still goes to that engineer's own chief for approval. Snapshotted so
+      // moving someone to a new chief later never pulls work out of the old
+      // chief's queue.
+      routed_to_chief_id: subject.chief_id,
       description: optionalText(formData, "description"),
       follow_up_needed: followUpNeeded,
       follow_up_notes: followUpNeeded ? optionalText(formData, "follow_up_notes") : null,
@@ -209,12 +268,14 @@ export async function createServiceCall(
 
   await alertOversight({
     title: "Service call logged",
-    body: `${user.name} · ${primary.propertyLabel}${
-      primary.spaceLabel ? ` · ${primary.spaceLabel}` : ""
-    }`,
+    // Named for whose work it is, with the typist noted when they differ, so a
+    // chief reading the notification knows what landed in their queue.
+    body: `${subject.name}${onBehalf ? ` (entered by ${user.name})` : ""} · ${
+      primary.propertyLabel
+    }${primary.spaceLabel ? ` · ${primary.spaceLabel}` : ""}`,
     url: `/calls/${created.id}`,
     actorId: user.id,
-    chiefId: user.chief_id,
+    chiefId: subject.chief_id,
   });
 
   revalidatePath("/");

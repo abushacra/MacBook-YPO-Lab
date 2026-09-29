@@ -185,6 +185,7 @@ export type Database = {
           billed_at: string | null
           billed_reference: string | null
           routed_to_chief_id: string | null
+          entered_by: string | null
           reviewed_by: string | null
           reviewed_at: string | null
           review_note: string | null
@@ -215,6 +216,7 @@ export type Database = {
           billed_at?: string | null
           billed_reference?: string | null
           routed_to_chief_id?: string | null
+          entered_by?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
           review_note?: string | null
@@ -245,6 +247,7 @@ export type Database = {
           billed_at?: string | null
           billed_reference?: string | null
           routed_to_chief_id?: string | null
+          entered_by?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
           review_note?: string | null

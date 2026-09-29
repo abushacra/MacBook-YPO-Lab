@@ -49,6 +49,11 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
     ? await db().from("technicians").select("name").eq("id", call.reviewed_by).maybeSingle()
     : { data: null };
 
+  // Set only when an admin or chief typed this in for someone else.
+  const { data: enteredBy } = call.entered_by
+    ? await db().from("technicians").select("name").eq("id", call.entered_by).maybeSingle()
+    : { data: null };
+
   /*
    * Admins can sign off anything and revise a decision already made, which is
    * what makes them the backstop for shifts with no chief. A chief only sees
@@ -141,9 +146,10 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
       <dl className="card divide-y divide-hairline text-sm">
         <Row label="Date" value={formatDate(call.call_date)} />
         <Row
-          label="Logged by"
+          label="Service call for"
           value={`${technician?.name ?? "Unknown"}${technician?.company ? ` · ${technician.company}` : ""}`}
         />
+        {enteredBy && <Row label="Entered by" value={enteredBy.name} />}
         <Row label="Logged at" value={formatDateTime(call.created_at)} />
         {/* Pay rates stay admin-only; a vendor still sees what they quoted. */}
         {call.billed_amount != null &&

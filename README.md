@@ -160,6 +160,32 @@ one with:
 node -e "console.log(require('web-push').generateVAPIDKeys())"
 ```
 
+## Logging for someone else
+
+An admin or a chief gets a **Logged for** picker at the top of the new service
+call form. An admin may log for anyone active; a chief only for their own team.
+An ordinary engineer sees no picker, and the action applies the same rule again
+server side — the absent picker is a convenience, not the control.
+
+Everything about the call follows **whose work it is**, not who typed it:
+
+- it is priced at that person's own rate tier, never the typist's
+- it routes to that person's chief for approval
+- the push notification names them, noting the typist in brackets
+- the vendor amount field appears only when the *subject* is an outside vendor
+
+`service_calls.entered_by` records the typist, and is null for the ordinary case
+of someone logging their own work. The call detail screen shows **Service call
+for** and, when they differ, **Entered by**.
+
+Nobody can log for a deactivated person, and a chief cannot log for someone who
+has no chief assigned.
+
+One consequence worth knowing: a chief who logs a call for their own engineer
+can then approve it, because the separation rule only stops a chief approving a
+call whose *subject* is themselves. If entering and approving should be two
+different people, that rule is one line in `reviewServiceCall`.
+
 ## Approving in bulk
 
 The **To approve** filter on the Service Calls screen puts a checkbox on every
