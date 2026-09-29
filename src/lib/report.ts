@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/supabase";
 import { asHoursType, type HoursType } from "@/lib/constants";
+import { propertyShares } from "@/lib/call-shares";
 
 /**
  * The service call report: every call in a date range, totalled by the person
@@ -13,11 +14,9 @@ import { asHoursType, type HoursType } from "@/lib/constants";
  * signed-off one.
  *
  * A call covering two properties counts as two service calls, one under each
- * property — that is the number of buildings actually attended. The money does
- * not follow: a call carries one amount, and there is no rule for dividing it
- * between two buildings, so it stays whole on the first property. A second
- * property therefore adds to the counts and nothing to the money, and
- * `loggedCount` is kept alongside for reconciling against the calls table.
+ * property — the number of buildings actually attended — with its amount split
+ * evenly between them, exactly as the pay run bills it. `loggedCount` is kept
+ * alongside for reconciling against the calls table.
  */
 
 export type ReportPropertyRow = {
@@ -127,7 +126,7 @@ export function groupReport(
      * One attendance at one property. A call covering two properties produces
      * two of these, so the totals read as buildings attended.
      */
-    const attend = (propertyId: string, label: string, carriesAmount: boolean) => {
+    const attend = (propertyId: string, label: string, share: number, isFirst: boolean) => {
       let row = person.byProperty.get(propertyId);
       if (row === undefined) {
         row = {
@@ -143,29 +142,24 @@ export function groupReport(
       }
 
       row.callCount += 1;
+      row.amount = Math.round((row.amount + share) * 100) / 100;
       person.callCount += 1;
+      person.amount = Math.round((person.amount + share) * 100) / 100;
       person.byCharge[charge] += 1;
 
-      /*
-       * The amount rides on the first property only. A call has one amount and
-       * no rule for splitting it, so halving it here would invent a number, and
-       * putting it on both would double the money. An unpriced call is likewise
-       * one call nobody is paid for, counted once.
-       */
-      if (!carriesAmount) return;
-      row.amount = Math.round((row.amount + amount) * 100) / 100;
-      person.amount = Math.round((person.amount + amount) * 100) / 100;
-      if (call.billed_amount === null) {
+      // An unpriced call is one call nobody is paid for however many buildings
+      // it covered, so it is counted on the first share only.
+      if (isFirst && call.billed_amount === null) {
         row.unpricedCount += 1;
         person.unpricedCount += 1;
       }
     };
 
-    attend(call.property_id, call.property_label, true);
-    if (call.property_id_2 !== null) {
-      attend(call.property_id_2, call.property_label_2 ?? "Second property", false);
-      person.secondPropertyCount += 1;
-    }
+    const shares = propertyShares(call, amount);
+    shares.forEach((share, index) =>
+      attend(share.propertyId, share.propertyLabel, share.amount, index === 0),
+    );
+    if (shares.length > 1) person.secondPropertyCount += 1;
 
     // Counted per row in the calls table, not per property attended: one call
     // is one record and one approval however many buildings it covered.

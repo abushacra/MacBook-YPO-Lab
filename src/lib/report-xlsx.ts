@@ -8,9 +8,10 @@ import { usDate } from "@/lib/payrun-csv";
  * subtotalled underneath, and a grand total at the foot.
  *
  * The property rows under a person always add up to that person's Service calls
- * total, because a call covering two properties is counted under each — see
- * `groupReport`. Calls logged and 2nd property are carried alongside so the two
- * numbers can be reconciled: calls logged plus second properties is the total.
+ * total and amount, because a call covering two properties is counted under each
+ * with its amount split between them — see `groupReport`. Calls logged and 2nd
+ * property are carried alongside so the two counts reconcile: calls logged plus
+ * second properties is the total.
  */
 export function reportXlsx(report: ServiceCallReport): Uint8Array {
   const rows: Cell[][] = [];
@@ -85,7 +86,7 @@ export function reportXlsx(report: ServiceCallReport): Uint8Array {
         report.secondPropertyCount > 0
           ? `Service calls counts each property attended: ${report.loggedCount} call${
               report.loggedCount === 1 ? "" : "s"
-            } logged, ${report.secondPropertyCount} of which also covered a second property, giving ${report.callCount}. The amount sits on the first property of each call, so a second property adds to the counts and nothing to the money.`
+            } logged, ${report.secondPropertyCount} of which also covered a second property, giving ${report.callCount}. A two-property call is counted under both, with its amount split evenly between them, exactly as the pay run bills it.`
           : `${report.loggedCount} call${
               report.loggedCount === 1 ? "" : "s"
             } logged, none covering a second property.`,

@@ -217,26 +217,29 @@ record of work done rather than an instruction to pay.
   the buttons and stops a person's block splitting across pages.
 
 A call covering two properties counts as **two service calls, one under each**,
-because two buildings were attended. So the property subtotals still add up to
-the engineer's total, and the headline figure is the real number of service
-calls.
+with its amount **split evenly between them** — the same division the pay run
+bills, so the two always agree. The property subtotals add up to the engineer's
+total, and the headline figure is the real number of buildings attended.
 
-The money does not follow. A call carries one amount and there is no rule for
-dividing it between two buildings, so it stays whole on the first property: a
-second property adds to the counts and nothing to the totals. Likewise one
-two-property call is still one approval and, if unpriced, one call nobody is paid
-for. The sheet carries **Calls logged** and **2nd property** beside **Service
-calls** so the two figures reconcile — logged plus second properties is the
-total.
+One two-property call is still **one approval** and, if unpriced, **one call
+nobody is paid for**, because both of those are per record. The sheet carries
+**Calls logged** and **2nd property** beside **Service calls** so the figures
+reconcile — logged plus second properties is the total.
 
-**The pay run is deliberately not changed by this.** It still puts a call's whole
-amount on the first property and counts it once, because a bill line's quantity
-has to match the money on it.
+## Splitting a two-property call
 
-| | Report | Pay run |
-| --- | --- | --- |
-| Two-property call counts as | 2 | 1 |
-| Its amount | on the first property | on the first property |
+`src/lib/call-shares.ts` holds this rule once, for both the report and the pay
+run, so they cannot drift apart.
+
+A call names one or two properties and carries a single amount. When it covers
+two, each property gets its own line and the amount is halved. Repeating the
+whole amount on both lines would bill twice for one call and pay the engineer
+twice for one day; the halves add back to exactly what the call was worth.
+
+The split is done in whole cents with any leftover cent going to the first
+property, so $125.01 becomes $62.51 and $62.50 rather than two $62.505s that
+round to the wrong total. On the bill each half is its own item line, so
+Quantity × Rate = Amount still holds.
 
 ## Pay run — bills for QuickBooks Online
 
@@ -317,8 +320,8 @@ Each is counted and shown rather than dropped quietly:
   vendor who left it blank. Nobody gets paid for these, so they are worth chasing
 - service calls **already billed** on an earlier run
 
-A service call covering two properties keeps its whole amount on the first property and
-is flagged, rather than being split on a guess.
+A service call covering two properties becomes a line under each, with the amount
+split evenly — see **Splitting a two-property call** above.
 
 ### Not paying twice
 

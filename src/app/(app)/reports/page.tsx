@@ -42,8 +42,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <h1 className="mt-2 text-xl font-bold">Service call report</h1>
         <p className="mt-1 text-sm text-muted">
           Every service call in the range, totalled by engineer and subtotalled by
-          property underneath them. A call covering two properties counts once
-          under each.
+          property underneath them. A call covering two properties counts once under
+          each, with its amount split between them.
         </p>
       </div>
 
@@ -164,9 +164,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
             <p className="px-1 text-xs text-muted">
               {report.loggedCount} call{report.loggedCount === 1 ? "" : "s"} logged,{" "}
               {report.secondPropertyCount} of which also covered a second property — counted
-              under both, giving {report.callCount}. The amount stays whole on the first
-              property of each call, so a second property adds to the counts and nothing to
-              the money.
+              under both, giving {report.callCount}. Each of those has its amount split
+              evenly between its two properties, exactly as the pay run bills it.
             </p>
           )}
         </>
