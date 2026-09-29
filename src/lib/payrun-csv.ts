@@ -14,7 +14,8 @@ import { BILL_LOCATION } from "@/lib/quickbooks";
  *
  * An in-house engineer's lines are "Item Details" rows: one service call is one
  * unit of the product, so Quantity is the call count, Rate is what a call was
- * billed at, and the Description names the Service Call Charge behind that rate. Writing Rate
+ * billed at, and the Description carries only what no column already holds: the
+ * Service Call Charge behind that rate, and the period. Writing Rate
  * and Amount on the row is what makes QuickBooks bill at the rate saved in this
  * app rather than the item's own cost.
  *
@@ -85,7 +86,9 @@ export function payRunCsv(payRun: PayRun): string {
               productService: vendor.billTarget,
               quantity: String(line.shiftCount),
               rate: line.rate.toFixed(2),
-              description: `${calls} at ${line.rate.toFixed(2)} \u00b7 ${HOURS_TYPE_LABELS[line.hoursType]} \u2014 ${period}`,
+              // Quantity and Rate are columns of their own on an item row, so
+              // repeating them here just reads like the line is counted twice.
+              description: `${HOURS_TYPE_LABELS[line.hoursType]} \u2014 ${period}`,
             }
           : {
               type: "Category Details",
@@ -93,6 +96,7 @@ export function payRunCsv(payRun: PayRun): string {
               productService: "",
               quantity: "",
               rate: "",
+              // A category row has no Quantity column, so the count belongs here.
               description: `${calls} \u2014 ${period}`,
             };
 
