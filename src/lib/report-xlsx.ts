@@ -21,6 +21,10 @@ import { usDate } from "@/lib/payrun-csv";
  * people in the same order as the summary. It is a flat table rather than
  * indented blocks so Excel can sort, filter and pivot it; the engineer's name
  * repeats on every row for the same reason.
+ *
+ * The **Service calls** column on each detail row is what that call counts as —
+ * 1, 1.5 or 2 by its Service Call Charge — so the column adds up to the figure
+ * on the summary.
  */
 export function reportXlsx(report: ServiceCallReport): Uint8Array {
   return buildXlsx([
@@ -45,7 +49,12 @@ function summaryRows(report: ServiceCallReport): Cell[][] {
 
   rows.push([{ value: "Service calls by engineer", style: "title" }]);
   rows.push([{ value: `${usDate(report.from)} to ${usDate(report.to)}` }]);
-  rows.push([]);
+  rows.push([
+    {
+      value:
+        "A x 1.5 call counts as 1.5 service calls and a x 2 as 2, so Service calls can differ from the number of calls logged.",
+    },
+  ]);
   rows.push([
     { value: "Engineer / property", style: "bold" },
     { value: "Service calls", style: "bold" },
@@ -119,6 +128,7 @@ const DETAIL_COLUMNS = [
   { width: 12 },
   { width: 30 },
   { width: 30 },
+  { width: 13 },
   { width: 18 },
   { width: 12 },
   { width: 17 },
@@ -139,6 +149,7 @@ function detailRows(report: ServiceCallReport): Cell[][] {
       "Date",
       "Property",
       "Second property",
+      "Service calls",
       "Service Call Charge",
       "Call type",
       "Approval",
@@ -155,6 +166,9 @@ function detailRows(report: ServiceCallReport): Cell[][] {
         { value: usDate(call.date) },
         { value: call.property },
         { value: call.secondProperty ?? "" },
+        // What this call counts as, beside the charge that sets it, so the
+        // column can simply be added up.
+        { value: call.weight },
         { value: HOURS_TYPE_LABELS[call.hoursType] },
         { value: CALL_TYPE_LABELS[call.callType as CallType] ?? call.callType },
         { value: APPROVAL_LABELS[call.approvalStatus as ApprovalStatus] ?? call.approvalStatus },
@@ -170,10 +184,11 @@ function detailRows(report: ServiceCallReport): Cell[][] {
   rows.push([]);
   rows.push([
     { value: "All engineers", style: "bold" },
+    { value: "" },
+    { value: "" },
+    { value: "" },
     { value: report.callCount, style: "bold" },
-    { value: "calls" },
-    { value: "" },
-    { value: "" },
+    { value: "service calls" },
     { value: "" },
     { value: "" },
     { value: "" },

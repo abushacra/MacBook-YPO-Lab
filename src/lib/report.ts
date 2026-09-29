@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/supabase";
 import { asHoursType, type HoursType } from "@/lib/constants";
 import { formatLocation } from "@/lib/format";
+import { HOURS_TYPE_MULTIPLIERS } from "@/lib/rates";
 
 /**
  * The service call report: every call in a date range, totalled by the person
@@ -12,11 +13,18 @@ import { formatLocation } from "@/lib/format";
  * is a record of work done rather than an instruction to pay. What is still
  * awaiting approval is counted separately so a total is never mistaken for a
  * signed-off one.
+ *
+ * A call counts as its Service Call Charge rather than as one row: Regular is
+ * one service call, x 1.5 is one and a half, x 2 is two. That is the same
+ * multiplier the call was priced at, so the totals read as work done rather than
+ * as forms filled in — thirteen calls including four at x 1.5 and one at x 2
+ * come to sixteen service calls.
  */
 
 export type ReportPropertyRow = {
   propertyId: string;
   propertyName: string;
+  /** Weighted by Service Call Charge, so a x 1.5 call counts as 1.5. */
   callCount: number;
   amount: number;
   /** Calls with no amount yet — an engineer with no rate, or a vendor who left it blank. */
@@ -29,6 +37,8 @@ export type ReportCallRow = {
   property: string;
   secondProperty: string | null;
   hoursType: HoursType;
+  /** What this one call counts as: 1, 1.5 or 2, by its Service Call Charge. */
+  weight: number;
   callType: string;
   approvalStatus: string;
   followUpNeeded: boolean;
@@ -153,11 +163,20 @@ export function groupReport(
 
     const amount = call.billed_amount ?? 0;
 
-    row.callCount += 1;
+    /*
+     * What this call counts as. A x 1.5 call is a call and a half and a x 2 is
+     * two, the same multiple it was priced at, so the service call totals track
+     * the work rather than the number of rows. Weights are halves, which are
+     * exact in binary floating point, but the sums are rounded anyway so a long
+     * column can never drift.
+     */
+    const weight = HOURS_TYPE_MULTIPLIERS[asHoursType(call.hours_type)];
+
+    row.callCount = Math.round((row.callCount + weight) * 100) / 100;
     row.amount = Math.round((row.amount + amount) * 100) / 100;
     if (call.billed_amount === null) row.unpricedCount += 1;
 
-    person.callCount += 1;
+    person.callCount = Math.round((person.callCount + weight) * 100) / 100;
     person.amount = Math.round((person.amount + amount) * 100) / 100;
     if (call.billed_amount === null) person.unpricedCount += 1;
     if (call.approval_status === "pending") person.pendingCount += 1;
@@ -174,6 +193,7 @@ export function groupReport(
         ? formatLocation(call.property_label_2, call.space_label_2)
         : null,
       hoursType: asHoursType(call.hours_type),
+      weight,
       callType: call.call_type,
       approvalStatus: call.approval_status,
       followUpNeeded: call.follow_up_needed,
@@ -200,7 +220,7 @@ export function groupReport(
     from,
     to,
     people: rows,
-    callCount: sum((person) => person.callCount),
+    callCount: Math.round(sum((person) => person.callCount) * 100) / 100,
     amount: Math.round(sum((person) => person.amount) * 100) / 100,
     unpricedCount: sum((person) => person.unpricedCount),
     pendingCount: sum((person) => person.pendingCount),

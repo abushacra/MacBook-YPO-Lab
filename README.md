@@ -207,6 +207,22 @@ no amount.
 Unlike a pay run this counts **everything in range, approved or not** — it is a
 record of work done rather than an instruction to pay.
 
+**A call counts as its Service Call Charge, not as one row.** Regular is one
+service call, x 1.5 is one and a half, x 2 is two — the same multiple the call
+was priced at, so the totals track the work rather than the number of forms
+filled in. Rudy's thirteen September calls, eight Regular and four at x 1.5 and
+one at x 2, come to **16 service calls**. The weight is `HOURS_TYPE_MULTIPLIERS`
+from `rates.ts`, shared with pricing so the two can never disagree.
+
+The Regular / x 1.5 / x 2 columns stay as **counts of calls**, so they add up to
+the number logged rather than to the weighted figure — which is what makes the 13
+and the 16 both visible on one row. The Detail sheet carries the weight on every
+call in its own **Service calls** column, so the column can simply be summed.
+
+**The pay run is not weighted.** A bill line's Quantity is a count of the item
+being bought, and Quantity × Rate has to equal the Amount, so an x 2 call is one
+unit at twice the rate rather than two units.
+
 Underneath each engineer's summary comes **every call they logged, listed by
 date** — property and space, the second property if there was one, the Service
 Call Charge, emergency or scheduled, approval state, follow-up flag, amount and

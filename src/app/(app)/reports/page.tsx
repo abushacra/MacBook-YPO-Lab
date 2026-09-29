@@ -18,6 +18,11 @@ function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
+/** 1, 1.5, 2 — a whole number stays whole rather than reading 1.0. */
+function formatCalls(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function isDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
@@ -48,7 +53,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <h1 className="mt-2 text-xl font-bold">Service call report</h1>
         <p className="mt-1 text-sm text-muted">
           Every service call in the range, totalled by engineer and subtotalled by
-          property underneath them, then every call listed by date.
+          property underneath them, then every call listed by date. A x 1.5 call
+          counts as 1.5 service calls and a x 2 as 2.
         </p>
       </div>
 
@@ -82,7 +88,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <div>
           <p className="text-sm font-semibold text-muted print:hidden">{range}</p>
           <p className="text-xs text-muted">
-            {report.callCount} service call{report.callCount === 1 ? "" : "s"} ·{" "}
+            {formatCalls(report.callCount)} service call{report.callCount === 1 ? "" : "s"} ·{" "}
             {report.people.length} {report.people.length === 1 ? "person" : "people"}
           </p>
         </div>
@@ -109,7 +115,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                   <div className="min-w-0">
                     <p className="truncate font-bold">{person.name}</p>
                     <p className="text-xs text-muted">
-                      {person.callCount} service call{person.callCount === 1 ? "" : "s"}
+                      {formatCalls(person.callCount)} service call
+                      {person.callCount === 1 ? "" : "s"}
                       {person.pendingCount > 0 && ` · ${person.pendingCount} awaiting approval`}
                       {person.unpricedCount > 0 && ` · ${person.unpricedCount} with no amount`}
                     </p>
@@ -138,7 +145,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                           {property.propertyName}
                         </span>
                         <span className="block text-xs text-muted">
-                          {property.callCount} service call
+                          {formatCalls(property.callCount)} service call
                           {property.callCount === 1 ? "" : "s"}
                         </span>
                       </span>
@@ -180,12 +187,17 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                           )}
                         </span>
                       </span>
-                      <span className="shrink-0 text-sm font-bold">
-                        {call.amount === null ? (
-                          <span className="text-xs font-semibold text-amber-800">No amount</span>
-                        ) : (
-                          formatMoney(call.amount)
-                        )}
+                      <span className="shrink-0 text-right">
+                        <span className="block text-sm font-bold">
+                          {call.amount === null ? (
+                            <span className="text-xs font-semibold text-amber-800">No amount</span>
+                          ) : (
+                            formatMoney(call.amount)
+                          )}
+                        </span>
+                        <span className="block text-xs text-muted">
+                          {formatCalls(call.weight)} call{call.weight === 1 ? "" : "s"}
+                        </span>
                       </span>
                     </li>
                   ))}
@@ -198,7 +210,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
             <div>
               <p className="text-sm font-bold">All engineers</p>
               <p className="text-xs text-muted">
-                {report.callCount} service call{report.callCount === 1 ? "" : "s"}
+                {formatCalls(report.callCount)} service call
+                {report.callCount === 1 ? "" : "s"}
               </p>
             </div>
             <p className="text-xl font-bold">{formatMoney(report.amount)}</p>
