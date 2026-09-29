@@ -210,10 +210,10 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                 </ul>
 
                 {vendor.splitShiftCount > 0 && (
-                  <p className="mt-2 text-xs text-muted">
-                    {vendor.splitShiftCount} service call
-                    {vendor.splitShiftCount === 1 ? "" : "s"} covered two properties, billed as
-                    a line under each with the amount split evenly. Nothing to do by hand.
+                  <p className="mt-2 text-xs font-semibold text-amber-800">
+                    {vendor.splitShiftCount} shift
+                    {vendor.splitShiftCount === 1 ? "" : "s"} covered two properties. The full
+                    amount sits on the first property — split it by hand if it should be shared.
                   </p>
                 )}
               </li>

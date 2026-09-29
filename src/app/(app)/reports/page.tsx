@@ -42,8 +42,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <h1 className="mt-2 text-xl font-bold">Service call report</h1>
         <p className="mt-1 text-sm text-muted">
           Every service call in the range, totalled by engineer and subtotalled by
-          property underneath them. A call covering two properties counts once under
-          each, with its amount split between them.
+          property underneath them.
         </p>
       </div>
 
@@ -105,8 +104,6 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                     <p className="truncate font-bold">{person.name}</p>
                     <p className="text-xs text-muted">
                       {person.callCount} service call{person.callCount === 1 ? "" : "s"}
-                      {person.secondPropertyCount > 0 &&
-                        ` · ${person.loggedCount} logged, ${person.secondPropertyCount} at two properties`}
                       {person.pendingCount > 0 && ` · ${person.pendingCount} awaiting approval`}
                       {person.unpricedCount > 0 && ` · ${person.unpricedCount} with no amount`}
                     </p>
@@ -154,7 +151,6 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
               <p className="text-sm font-bold">All engineers</p>
               <p className="text-xs text-muted">
                 {report.callCount} service call{report.callCount === 1 ? "" : "s"}
-                {report.secondPropertyCount > 0 && ` · ${report.loggedCount} logged`}
               </p>
             </div>
             <p className="text-xl font-bold">{formatMoney(report.amount)}</p>
@@ -162,10 +158,10 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
           {report.secondPropertyCount > 0 && (
             <p className="px-1 text-xs text-muted">
-              {report.loggedCount} call{report.loggedCount === 1 ? "" : "s"} logged,{" "}
-              {report.secondPropertyCount} of which also covered a second property — counted
-              under both, giving {report.callCount}. Each of those has its amount split
-              evenly between its two properties, exactly as the pay run bills it.
+              {report.secondPropertyCount} call
+              {report.secondPropertyCount === 1 ? "" : "s"} also covered a second property,
+              and {report.secondPropertyCount === 1 ? "is" : "are"} counted once here, under
+              the first — so the property subtotals always add up to the engineer&apos;s total.
             </p>
           )}
         </>

@@ -3,7 +3,6 @@ import "server-only";
 import { db } from "@/lib/supabase";
 import { asHoursType, type HoursType } from "@/lib/constants";
 import { billTarget } from "@/lib/quickbooks";
-import { propertyShares } from "@/lib/call-shares";
 
 /**
  * Builds a pay run: one vendor bill per person for the chosen dates, with one
@@ -13,10 +12,6 @@ import { propertyShares } from "@/lib/call-shares";
  * An in-house engineer's lines are product lines; an outside vendor's are
  * expense-category lines. That is the only difference, and it changes how
  * finely the lines are grouped — see the keying in `groupPayRun`.
- *
- * A call covering two properties becomes a line under each, with its amount
- * split evenly between them, so every property's customer can be charged and the
- * bill still totals exactly what the person earned.
  *
  * Only shifts that are approved AND priced AND not already billed are included.
  * Anything left out is counted and reported rather than silently dropped —
@@ -73,7 +68,7 @@ export type PayRunVendor = {
   lines: PayRunLine[];
   total: number;
   shiftCount: number;
-  /** Shifts covering two properties, billed as a line each with the amount halved. */
+  /** Shifts covering two properties: their whole amount sits on the first. */
   splitShiftCount: number;
 };
 
@@ -95,7 +90,6 @@ export type PayRunShift = {
   property_id: string;
   property_label: string;
   property_id_2: string | null;
-  property_label_2: string | null;
   hours_type: string;
   billed_amount: number | null;
   approval_status: string;
@@ -107,7 +101,7 @@ export async function buildPayRun(from: string, to: string): Promise<PayRun> {
     db()
       .from("service_calls")
       .select(
-        "id, technician_id, call_date, property_id, property_label, property_id_2, property_label_2, hours_type, billed_amount, approval_status, billed_at",
+        "id, technician_id, call_date, property_id, property_label, property_id_2, hours_type, billed_amount, approval_status, billed_at",
       )
       .gte("call_date", from)
       .lte("call_date", to),
@@ -170,7 +164,7 @@ export function groupPayRun(
      * carries only an amount, so differently quoted jobs at one property add up
      * onto one line.
      *
-     * An engineer's line also carries the Shift Charge and the rate, because an
+     * An engineer's line also carries the Service Call Charge and the rate, because an
      * item row has to satisfy Quantity x Rate = Amount. A property worked at
      * both Regular and x 2 therefore produces two lines rather than one whose
      * amount contradicts its own quantity and rate, and a tier an admin
@@ -178,38 +172,34 @@ export function groupPayRun(
      *
      * Keyed on the property id so renaming a property keeps its shifts together.
      */
-    const shares = propertyShares(shift, shift.billed_amount);
-    for (const [index, share] of shares.entries()) {
-      const key =
-        billAs === "category"
-          ? share.propertyId
-          : `${share.propertyId}|${hoursType}|${share.amount.toFixed(2)}`;
+    const key =
+      billAs === "category"
+        ? shift.property_id
+        : `${shift.property_id}|${hoursType}|${shift.billed_amount.toFixed(2)}`;
 
-      let entry = byProperty.get(key);
-      if (entry === undefined) {
-        const base = {
-          propertyId: share.propertyId,
-          // The live name is what must match the QuickBooks customer; the stored
-          // label is the fallback if the property was renamed out from under us.
-          customerName: propertyNameById.get(share.propertyId) ?? share.propertyLabel,
-          shiftCount: 0,
-          amount: 0,
-        };
-        entry = {
-          line:
-            billAs === "item"
-              ? { ...base, billAs, rate: share.amount, hoursType }
-              : { ...base, billAs },
-          splitShifts: 0,
-        };
-        byProperty.set(key, entry);
-      }
-
-      entry.line.shiftCount += 1;
-      entry.line.amount = Math.round((entry.line.amount + share.amount) * 100) / 100;
-      // Counted once for the shift, on its first share, not once per property.
-      if (shares.length > 1 && index === 0) entry.splitShifts += 1;
+    let entry = byProperty.get(key);
+    if (entry === undefined) {
+      const base = {
+        propertyId: shift.property_id,
+        // The live name is what must match the QuickBooks customer; the stored
+        // label is the fallback if the property was renamed out from under us.
+        customerName: propertyNameById.get(shift.property_id) ?? shift.property_label,
+        shiftCount: 0,
+        amount: 0,
+      };
+      entry = {
+        line:
+          billAs === "item"
+            ? { ...base, billAs, rate: shift.billed_amount, hoursType }
+            : { ...base, billAs },
+        splitShifts: 0,
+      };
+      byProperty.set(key, entry);
     }
+
+    entry.line.shiftCount += 1;
+    entry.line.amount = Math.round((entry.line.amount + shift.billed_amount) * 100) / 100;
+    if (shift.property_id_2 !== null) entry.splitShifts += 1;
   }
 
   const vendors: PayRunVendor[] = [...grouped.entries()]
