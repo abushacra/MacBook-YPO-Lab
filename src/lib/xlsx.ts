@@ -1,6 +1,6 @@
 /**
- * A very small .xlsx writer: enough to put one formatted sheet in a file Excel,
- * Numbers and Google Sheets all open, and nothing else.
+ * A very small .xlsx writer: enough to put a few formatted sheets in a file
+ * Excel, Numbers and Google Sheets all open, and nothing else.
  *
  * An .xlsx is a ZIP of XML parts. The parts here are the minimum set Excel will
  * accept, values are written as inline strings and numbers so there is no shared
@@ -77,11 +77,31 @@ function sheetXml(rows: Cell[][], columns: SheetColumn[]): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${cols}<sheetData>${body}</sheetData></worksheet>`;
 }
 
-const CONTENT_TYPES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
+function contentTypesXml(sheetCount: number): string {
+  const sheets = Array.from(
+    { length: sheetCount },
+    (_, i) =>
+      `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+  ).join("");
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
+}
 
 const ROOT_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
 
-const WORKBOOK_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+/**
+ * One relationship per sheet, then the styles. The sheets take rId1..rIdN so the
+ * ids in `workbookXml` line up, and styles takes the one after.
+ */
+function workbookRelsXml(sheetCount: number): string {
+  const sheets = Array.from(
+    { length: sheetCount },
+    (_, i) =>
+      `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+  ).join("");
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets}<Relationship Id="rId${sheetCount + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+}
 
 /**
  * Two fonts (normal, bold) and one number format, combined into the five cell
@@ -89,8 +109,17 @@ const WORKBOOK_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"
  */
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 
-function workbookXml(sheetName: string): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEscape(sheetName).slice(0, 31)}" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+function workbookXml(names: string[]): string {
+  const sheets = names
+    .map(
+      (name, i) =>
+        // Excel refuses a sheet name over 31 characters, so it is cut here
+        // rather than producing a file that will not open.
+        `<sheet name="${xmlEscape(name).slice(0, 31)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`,
+    )
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets}</sheets></workbook>`;
 }
 
 // --- the ZIP container -------------------------------------------------------
@@ -194,19 +223,24 @@ function zip(entries: ZipEntry[]): Uint8Array {
   return out;
 }
 
-/** Builds a one-sheet workbook from rows of cells. */
-export function buildXlsx(
-  sheetName: string,
-  rows: Cell[][],
-  columns: SheetColumn[] = [],
-): Uint8Array {
+export type Sheet = { name: string; rows: Cell[][]; columns?: SheetColumn[] };
+
+/** Builds a workbook from one or more sheets of cells. */
+export function buildXlsx(sheets: Sheet[]): Uint8Array {
   const text = new TextEncoder();
+
   return zip([
-    { name: "[Content_Types].xml", bytes: text.encode(CONTENT_TYPES_XML) },
+    { name: "[Content_Types].xml", bytes: text.encode(contentTypesXml(sheets.length)) },
     { name: "_rels/.rels", bytes: text.encode(ROOT_RELS_XML) },
-    { name: "xl/workbook.xml", bytes: text.encode(workbookXml(sheetName)) },
-    { name: "xl/_rels/workbook.xml.rels", bytes: text.encode(WORKBOOK_RELS_XML) },
+    {
+      name: "xl/workbook.xml",
+      bytes: text.encode(workbookXml(sheets.map((sheet) => sheet.name))),
+    },
+    { name: "xl/_rels/workbook.xml.rels", bytes: text.encode(workbookRelsXml(sheets.length)) },
     { name: "xl/styles.xml", bytes: text.encode(STYLES_XML) },
-    { name: "xl/worksheets/sheet1.xml", bytes: text.encode(sheetXml(rows, columns)) },
+    ...sheets.map((sheet, i) => ({
+      name: `xl/worksheets/sheet${i + 1}.xml`,
+      bytes: text.encode(sheetXml(sheet.rows, sheet.columns ?? [])),
+    })),
   ]);
 }

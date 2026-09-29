@@ -207,14 +207,26 @@ no amount.
 Unlike a pay run this counts **everything in range, approved or not** — it is a
 record of work done rather than an instruction to pay.
 
-- **Download Excel** gives a real `.xlsx`. It is written by `src/lib/xlsx.ts`, a
-  small ZIP-and-XML writer, rather than a spreadsheet dependency: the whole
-  surface used is four cell shapes on one sheet. Property rows are indented under
-  their engineer rather than grouped or merged, so the hierarchy survives a sort
-  or a copy-paste.
+Underneath each engineer's summary comes **every call they logged, listed by
+date** — property and space, the second property if there was one, the Service
+Call Charge, emergency or scheduled, approval state, follow-up flag, amount and
+the description of the work.
+
+- **Download Excel** gives a real `.xlsx` with two sheets. **Summary** is the
+  blocks and subtotals; **Detail** is one row per call, oldest first within each
+  person, as a flat table with the engineer's name repeated on every row so Excel
+  can sort, filter and pivot it. The file is written by `src/lib/xlsx.ts`, a small
+  ZIP-and-XML writer, rather than a spreadsheet dependency: the whole surface used
+  is four cell shapes and a couple of sheets. On the summary sheet the property
+  rows are indented under their engineer rather than grouped or merged, so the
+  hierarchy survives a sort or a copy-paste. An unpriced call leaves Amount blank
+  rather than showing zero, so it cannot be read as work that was worth nothing.
 - **Print / save PDF** uses the browser's own print dialog, which every phone and
-  desktop can save as a PDF. `@media print` in `globals.css` drops the nav and
-  the buttons and stops a person's block splitting across pages.
+  desktop can save as a PDF. `@media print` in `globals.css` drops the nav and the
+  buttons, and keeps individual rows and headings from splitting. An engineer's
+  block is deliberately allowed to break across pages: with the call list under it
+  a block can run past a page, and telling the browser to avoid breaking it would
+  push it onto a page of its own and leave the rest blank.
 
 A call covering two properties is counted **once, under the first**, the same
 choice the pay run makes — so the property subtotals always add up to the

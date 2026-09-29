@@ -1,16 +1,46 @@
 import type { ServiceCallReport } from "@/lib/report";
 import { buildXlsx, type Cell } from "@/lib/xlsx";
-import { HOURS_TYPE_LABELS } from "@/lib/constants";
+import {
+  APPROVAL_LABELS,
+  CALL_TYPE_LABELS,
+  HOURS_TYPE_LABELS,
+  type ApprovalStatus,
+  type CallType,
+} from "@/lib/constants";
 import { usDate } from "@/lib/payrun-csv";
 
 /**
- * The service call report as a spreadsheet: a block per person, their properties
- * subtotalled underneath, and a grand total at the foot.
+ * The service call report as a spreadsheet, in two sheets.
  *
- * The property rows under a person always add up to that person's total, because
- * a call covering two properties is counted once — see `groupReport`.
+ * **Summary** is a block per person with their properties subtotalled underneath
+ * and a grand total at the foot. The property rows under a person always add up
+ * to that person's total, because a call covering two properties is counted once
+ * — see `groupReport`.
+ *
+ * **Detail** is every call, one per row, oldest first within each person and the
+ * people in the same order as the summary. It is a flat table rather than
+ * indented blocks so Excel can sort, filter and pivot it; the engineer's name
+ * repeats on every row for the same reason.
  */
 export function reportXlsx(report: ServiceCallReport): Uint8Array {
+  return buildXlsx([
+    { name: "Summary", rows: summaryRows(report), columns: SUMMARY_COLUMNS },
+    { name: "Detail", rows: detailRows(report), columns: DETAIL_COLUMNS },
+  ]);
+}
+
+const SUMMARY_COLUMNS = [
+  { width: 38 },
+  { width: 13 },
+  { width: 13 },
+  { width: 10 },
+  { width: 18 },
+  { width: 16 },
+  { width: 17 },
+  { width: 11 },
+];
+
+function summaryRows(report: ServiceCallReport): Cell[][] {
   const rows: Cell[][] = [];
 
   rows.push([{ value: "Service calls by engineer", style: "title" }]);
@@ -76,19 +106,79 @@ export function reportXlsx(report: ServiceCallReport): Uint8Array {
           report.secondPropertyCount === 1 ? "" : "s"
         } also covered a second property, and ${
           report.secondPropertyCount === 1 ? "is" : "are"
-        } counted once, under the first.`,
+        } counted once, under the first. The second property is named on each call in the Detail sheet.`,
       },
     ]);
   }
 
-  return buildXlsx("Service calls", rows, [
-    { width: 38 },
-    { width: 13 },
-    { width: 13 },
-    { width: 10 },
-    { width: 14 },
-    { width: 12 },
-    { width: 17 },
-    { width: 11 },
+  return rows;
+}
+
+const DETAIL_COLUMNS = [
+  { width: 22 },
+  { width: 12 },
+  { width: 30 },
+  { width: 30 },
+  { width: 18 },
+  { width: 12 },
+  { width: 17 },
+  { width: 10 },
+  { width: 12 },
+  { width: 52 },
+];
+
+function detailRows(report: ServiceCallReport): Cell[][] {
+  const rows: Cell[][] = [];
+
+  rows.push([{ value: "Service calls by date", style: "title" }]);
+  rows.push([{ value: `${usDate(report.from)} to ${usDate(report.to)}` }]);
+  rows.push([]);
+  rows.push(
+    [
+      "Engineer",
+      "Date",
+      "Property",
+      "Second property",
+      "Service Call Charge",
+      "Call type",
+      "Approval",
+      "Follow-up",
+      "Amount",
+      "Work completed",
+    ].map((value) => ({ value, style: "bold" as const })),
+  );
+
+  for (const person of report.people) {
+    for (const call of person.calls) {
+      rows.push([
+        { value: person.name },
+        { value: usDate(call.date) },
+        { value: call.property },
+        { value: call.secondProperty ?? "" },
+        { value: HOURS_TYPE_LABELS[call.hoursType] },
+        { value: CALL_TYPE_LABELS[call.callType as CallType] ?? call.callType },
+        { value: APPROVAL_LABELS[call.approvalStatus as ApprovalStatus] ?? call.approvalStatus },
+        { value: call.followUpNeeded ? "Yes" : "" },
+        // Left blank rather than zero when a call has no amount, so an unpriced
+        // call cannot be mistaken for one that was worth nothing.
+        call.amount === null ? { value: "" } : { value: call.amount, style: "money" },
+        { value: call.description ?? "" },
+      ]);
+    }
+  }
+
+  rows.push([]);
+  rows.push([
+    { value: "All engineers", style: "bold" },
+    { value: report.callCount, style: "bold" },
+    { value: "calls" },
+    { value: "" },
+    { value: "" },
+    { value: "" },
+    { value: "" },
+    { value: "" },
+    { value: report.amount, style: "boldMoney" },
   ]);
+
+  return rows;
 }

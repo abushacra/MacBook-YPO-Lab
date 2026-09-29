@@ -5,6 +5,12 @@ import { buildReport } from "@/lib/report";
 import { formatDate, formatMoney, todayISO } from "@/lib/format";
 import { HOURS_TYPE_LABELS } from "@/lib/constants";
 import { PrintButton } from "@/components/print-button";
+import {
+  ApprovalBadge,
+  CallTypeBadge,
+  FollowUpBadge,
+  HoursBadge,
+} from "@/components/call-badges";
 
 export const metadata = { title: "Report · Kapa Service Log" };
 
@@ -42,7 +48,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <h1 className="mt-2 text-xl font-bold">Service call report</h1>
         <p className="mt-1 text-sm text-muted">
           Every service call in the range, totalled by engineer and subtotalled by
-          property underneath them.
+          property underneath them, then every call listed by date.
         </p>
       </div>
 
@@ -98,7 +104,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
           <ul className="space-y-3">
             {report.people.map((person) => (
-              <li key={person.technicianId} className="card p-4 break-inside-avoid">
+              <li key={person.technicianId} className="card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-bold">{person.name}</p>
@@ -142,6 +148,48 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                     </li>
                   ))}
                 </ul>
+
+                <h3 className="section-heading mt-4 mb-1">Every call, by date</h3>
+                <ol className="divide-y divide-hairline border-t border-hairline">
+                  {person.calls.map((call, index) => (
+                    <li
+                      key={`${call.date}-${index}`}
+                      className="flex items-start justify-between gap-3 py-2"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">
+                          {formatDate(call.date, { weekday: "short", year: undefined })} ·{" "}
+                          {call.property}
+                        </span>
+                        {call.secondProperty && (
+                          <span className="block text-sm font-semibold text-muted">
+                            + {call.secondProperty}
+                          </span>
+                        )}
+                        {call.description && (
+                          <span className="mt-0.5 block text-xs text-muted">
+                            {call.description}
+                          </span>
+                        )}
+                        <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <CallTypeBadge value={call.callType} />
+                          <HoursBadge value={call.hoursType} />
+                          {call.followUpNeeded && <FollowUpBadge />}
+                          {call.approvalStatus !== "approved" && (
+                            <ApprovalBadge value={call.approvalStatus} />
+                          )}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-sm font-bold">
+                        {call.amount === null ? (
+                          <span className="text-xs font-semibold text-amber-800">No amount</span>
+                        ) : (
+                          formatMoney(call.amount)
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
               </li>
             ))}
           </ul>

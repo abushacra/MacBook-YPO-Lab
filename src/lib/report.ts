@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/supabase";
 import { asHoursType, type HoursType } from "@/lib/constants";
+import { formatLocation } from "@/lib/format";
 
 /**
  * The service call report: every call in a date range, totalled by the person
@@ -22,6 +23,19 @@ export type ReportPropertyRow = {
   unpricedCount: number;
 };
 
+/** One service call, as it appears in the detail list under its engineer. */
+export type ReportCallRow = {
+  date: string;
+  property: string;
+  secondProperty: string | null;
+  hoursType: HoursType;
+  callType: string;
+  approvalStatus: string;
+  followUpNeeded: boolean;
+  description: string | null;
+  amount: number | null;
+};
+
 export type ReportPersonRow = {
   technicianId: string;
   name: string;
@@ -34,6 +48,8 @@ export type ReportPersonRow = {
   secondPropertyCount: number;
   byCharge: Record<HoursType, number>;
   properties: ReportPropertyRow[];
+  /** Every call this person logged in the range, oldest first. */
+  calls: ReportCallRow[];
 };
 
 export type ServiceCallReport = {
@@ -49,12 +65,19 @@ export type ServiceCallReport = {
 
 export type ReportCall = {
   technician_id: string;
+  call_date: string;
   property_id: string;
   property_label: string;
+  space_label: string | null;
   property_id_2: string | null;
+  property_label_2: string | null;
+  space_label_2: string | null;
   hours_type: string;
-  billed_amount: number | null;
+  call_type: string;
   approval_status: string;
+  follow_up_needed: boolean;
+  description: string | null;
+  billed_amount: number | null;
 };
 
 export async function buildReport(from: string, to: string): Promise<ServiceCallReport> {
@@ -62,7 +85,7 @@ export async function buildReport(from: string, to: string): Promise<ServiceCall
     db()
       .from("service_calls")
       .select(
-        "technician_id, property_id, property_label, property_id_2, hours_type, billed_amount, approval_status",
+        "technician_id, call_date, property_id, property_label, space_label, property_id_2, property_label_2, space_label_2, hours_type, call_type, approval_status, follow_up_needed, description, billed_amount",
       )
       .gte("call_date", from)
       .lte("call_date", to),
@@ -101,6 +124,7 @@ export function groupReport(
         secondPropertyCount: 0,
         byCharge: { regular: 0, after_hours: 0, double_time: 0 },
         properties: [],
+        calls: [],
         byProperty: new Map(),
       };
       people.set(call.technician_id, person);
@@ -139,6 +163,23 @@ export function groupReport(
     if (call.approval_status === "pending") person.pendingCount += 1;
     if (call.property_id_2 !== null) person.secondPropertyCount += 1;
     person.byCharge[asHoursType(call.hours_type)] += 1;
+
+    // The detail list: the call itself, for the day-by-day view under the
+    // summary. Labels are resolved here so the screen and the spreadsheet read
+    // the same thing.
+    person.calls.push({
+      date: call.call_date,
+      property: formatLocation(call.property_label, call.space_label),
+      secondProperty: call.property_label_2
+        ? formatLocation(call.property_label_2, call.space_label_2)
+        : null,
+      hoursType: asHoursType(call.hours_type),
+      callType: call.call_type,
+      approvalStatus: call.approval_status,
+      followUpNeeded: call.follow_up_needed,
+      description: call.description,
+      amount: call.billed_amount,
+    });
   }
 
   const rows = [...people.values()]
@@ -147,6 +188,8 @@ export function groupReport(
       properties: [...byProperty.values()].sort(
         (a, b) => b.callCount - a.callCount || a.propertyName.localeCompare(b.propertyName),
       ),
+      // Oldest first, which is the order a timesheet reads in.
+      calls: [...person.calls].sort((a, b) => a.date.localeCompare(b.date)),
     }))
     .sort((a, b) => b.callCount - a.callCount || a.name.localeCompare(b.name));
 

@@ -131,7 +131,23 @@ input[type="number"]::-webkit-inner-spin-button {
     border: 1px solid #d4d4d8;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  /*
+   * An engineer's block now carries their whole call list, which can run past a
+   * page, so the block itself has to be allowed to break — telling the browser
+   * to avoid it would push an over-long one onto a page of its own and leave the
+   * rest blank. The individual rows are what must not split.
+   */
+  li,
+  h2,
+  h3 {
     break-inside: avoid;
+  }
+
+  h2,
+  h3 {
+    break-after: avoid;
   }
 
   .chip {
