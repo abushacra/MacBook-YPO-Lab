@@ -216,9 +216,27 @@ record of work done rather than an instruction to pay.
   desktop can save as a PDF. `@media print` in `globals.css` drops the nav and
   the buttons and stops a person's block splitting across pages.
 
-A call covering two properties is counted **once, under the first**, the same
-choice the pay run makes — so the property subtotals always add up to the
-engineer's total. The count of such calls is shown at the foot.
+A call covering two properties counts as **two service calls, one under each**,
+because two buildings were attended. So the property subtotals still add up to
+the engineer's total, and the headline figure is the real number of service
+calls.
+
+The money does not follow. A call carries one amount and there is no rule for
+dividing it between two buildings, so it stays whole on the first property: a
+second property adds to the counts and nothing to the totals. Likewise one
+two-property call is still one approval and, if unpriced, one call nobody is paid
+for. The sheet carries **Calls logged** and **2nd property** beside **Service
+calls** so the two figures reconcile — logged plus second properties is the
+total.
+
+**The pay run is deliberately not changed by this.** It still puts a call's whole
+amount on the first property and counts it once, because a bill line's quantity
+has to match the money on it.
+
+| | Report | Pay run |
+| --- | --- | --- |
+| Two-property call counts as | 2 | 1 |
+| Its amount | on the first property | on the first property |
 
 ## Pay run — bills for QuickBooks Online
 

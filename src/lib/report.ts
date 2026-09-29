@@ -11,6 +11,13 @@ import { asHoursType, type HoursType } from "@/lib/constants";
  * is a record of work done rather than an instruction to pay. What is still
  * awaiting approval is counted separately so a total is never mistaken for a
  * signed-off one.
+ *
+ * A call covering two properties counts as two service calls, one under each
+ * property — that is the number of buildings actually attended. The money does
+ * not follow: a call carries one amount, and there is no rule for dividing it
+ * between two buildings, so it stays whole on the first property. A second
+ * property therefore adds to the counts and nothing to the money, and
+ * `loggedCount` is kept alongside for reconciling against the calls table.
  */
 
 export type ReportPropertyRow = {
@@ -26,11 +33,14 @@ export type ReportPersonRow = {
   technicianId: string;
   name: string;
   kind: string;
+  /** Properties attended: one per call, plus one more for each second property. */
   callCount: number;
+  /** Rows in the calls table, whatever number of properties each covered. */
+  loggedCount: number;
   amount: number;
   unpricedCount: number;
   pendingCount: number;
-  /** Calls that also covered a second property, counted here on the first only. */
+  /** Calls that also covered a second property, and so count twice above. */
   secondPropertyCount: number;
   byCharge: Record<HoursType, number>;
   properties: ReportPropertyRow[];
@@ -40,7 +50,9 @@ export type ServiceCallReport = {
   from: string;
   to: string;
   people: ReportPersonRow[];
+  /** The headline total: properties attended, second properties included. */
   callCount: number;
+  loggedCount: number;
   amount: number;
   unpricedCount: number;
   pendingCount: number;
@@ -52,6 +64,7 @@ export type ReportCall = {
   property_id: string;
   property_label: string;
   property_id_2: string | null;
+  property_label_2: string | null;
   hours_type: string;
   billed_amount: number | null;
   approval_status: string;
@@ -62,7 +75,7 @@ export async function buildReport(from: string, to: string): Promise<ServiceCall
     db()
       .from("service_calls")
       .select(
-        "technician_id, property_id, property_label, property_id_2, hours_type, billed_amount, approval_status",
+        "technician_id, property_id, property_label, property_id_2, property_label_2, hours_type, billed_amount, approval_status",
       )
       .gte("call_date", from)
       .lte("call_date", to),
@@ -95,6 +108,7 @@ export function groupReport(
         name: technician?.name ?? "Unknown",
         kind: technician?.kind ?? "in_house",
         callCount: 0,
+        loggedCount: 0,
         amount: 0,
         unpricedCount: 0,
         pendingCount: 0,
@@ -106,39 +120,57 @@ export function groupReport(
       people.set(call.technician_id, person);
     }
 
-    /*
-     * A call covering two properties is counted once, on the first — the same
-     * choice the pay run makes. Splitting it would need a rule for how to divide
-     * one call between two buildings, and there isn't one. Counting it twice
-     * would stop the property subtotals adding up to the person's total, which
-     * is the whole point of the report.
-     */
-    let row = person.byProperty.get(call.property_id);
-    if (row === undefined) {
-      row = {
-        propertyId: call.property_id,
-        // The live name, falling back to the label stored on the call if the
-        // property has since been deleted.
-        propertyName: propertyNameById.get(call.property_id) ?? call.property_label,
-        callCount: 0,
-        amount: 0,
-        unpricedCount: 0,
-      };
-      person.byProperty.set(call.property_id, row);
-    }
-
+    const charge = asHoursType(call.hours_type);
     const amount = call.billed_amount ?? 0;
 
-    row.callCount += 1;
-    row.amount = Math.round((row.amount + amount) * 100) / 100;
-    if (call.billed_amount === null) row.unpricedCount += 1;
+    /**
+     * One attendance at one property. A call covering two properties produces
+     * two of these, so the totals read as buildings attended.
+     */
+    const attend = (propertyId: string, label: string, carriesAmount: boolean) => {
+      let row = person.byProperty.get(propertyId);
+      if (row === undefined) {
+        row = {
+          propertyId,
+          // The live name, falling back to the label stored on the call if the
+          // property has since been deleted.
+          propertyName: propertyNameById.get(propertyId) ?? label,
+          callCount: 0,
+          amount: 0,
+          unpricedCount: 0,
+        };
+        person.byProperty.set(propertyId, row);
+      }
 
-    person.callCount += 1;
-    person.amount = Math.round((person.amount + amount) * 100) / 100;
-    if (call.billed_amount === null) person.unpricedCount += 1;
+      row.callCount += 1;
+      person.callCount += 1;
+      person.byCharge[charge] += 1;
+
+      /*
+       * The amount rides on the first property only. A call has one amount and
+       * no rule for splitting it, so halving it here would invent a number, and
+       * putting it on both would double the money. An unpriced call is likewise
+       * one call nobody is paid for, counted once.
+       */
+      if (!carriesAmount) return;
+      row.amount = Math.round((row.amount + amount) * 100) / 100;
+      person.amount = Math.round((person.amount + amount) * 100) / 100;
+      if (call.billed_amount === null) {
+        row.unpricedCount += 1;
+        person.unpricedCount += 1;
+      }
+    };
+
+    attend(call.property_id, call.property_label, true);
+    if (call.property_id_2 !== null) {
+      attend(call.property_id_2, call.property_label_2 ?? "Second property", false);
+      person.secondPropertyCount += 1;
+    }
+
+    // Counted per row in the calls table, not per property attended: one call
+    // is one record and one approval however many buildings it covered.
+    person.loggedCount += 1;
     if (call.approval_status === "pending") person.pendingCount += 1;
-    if (call.property_id_2 !== null) person.secondPropertyCount += 1;
-    person.byCharge[asHoursType(call.hours_type)] += 1;
   }
 
   const rows = [...people.values()]
@@ -158,6 +190,7 @@ export function groupReport(
     to,
     people: rows,
     callCount: sum((person) => person.callCount),
+    loggedCount: sum((person) => person.loggedCount),
     amount: Math.round(sum((person) => person.amount) * 100) / 100,
     unpricedCount: sum((person) => person.unpricedCount),
     pendingCount: sum((person) => person.pendingCount),
