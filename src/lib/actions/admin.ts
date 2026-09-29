@@ -297,6 +297,45 @@ export async function deleteProperty(formData: FormData): Promise<void> {
 }
 
 /**
+ * Removes a person outright, admin only.
+ *
+ * Only for someone who was never really used — a duplicate, a typo, a test
+ * account. Anyone who logged a service call or a receipt keeps their record: the
+ * foreign keys are RESTRICT, so the delete would fail anyway, and the admin
+ * screen offers Deactivate instead, which takes them off every list and blocks
+ * sign-in while leaving their history intact.
+ *
+ * Two further blocks are enforced here rather than by the database, because the
+ * database would let them through quietly: someone other people report to would
+ * leave those people with no chief, and an admin deleting themselves would lock
+ * the door behind them.
+ */
+export async function deleteTechnician(formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const id = idFrom(formData);
+  if (!id) return;
+  if (id === admin.id) return;
+
+  const { data: usage } = await db()
+    .from("technician_usage")
+    .select("service_call_count, expense_count, reports_count")
+    .eq("technician_id", id)
+    .maybeSingle();
+
+  if (
+    (usage?.service_call_count ?? 0) > 0 ||
+    (usage?.expense_count ?? 0) > 0 ||
+    (usage?.reports_count ?? 0) > 0
+  ) {
+    return;
+  }
+
+  // Rates and push subscriptions cascade with the row.
+  await db().from("technicians").delete().eq("id", id);
+  refreshAdminViews();
+}
+
+/**
  * Removes a space. Always safe: service calls keep the space they recorded as
  * a plain label, so deleting the entry only takes it off the suggestion list.
  */

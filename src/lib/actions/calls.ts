@@ -278,6 +278,64 @@ export async function reviewServiceCall(formData: FormData): Promise<void> {
   revalidatePath(`/calls/${id}`);
 }
 
+/** How many service calls one bulk approval may cover. */
+const BULK_APPROVE_LIMIT = 200;
+
+/**
+ * Approves several service calls at once, from the checkboxes on the To approve
+ * list.
+ *
+ * Every call is re-checked individually against the same rule as a single
+ * approval, rather than trusting the ids that came off the form: a chief can
+ * only sign off what was routed to them and never their own work, an admin can
+ * sign off anything. Ids that fail the check, or that someone else already
+ * reviewed, are dropped silently — approving fifteen calls should not fail
+ * because a sixteenth slipped through the cracks.
+ */
+export async function approveServiceCalls(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  if (!user.is_chief && !user.is_admin) return;
+
+  const ids = formData
+    .getAll("call_ids")
+    .filter((value): value is string => typeof value === "string")
+    .filter((value) => z.uuid().safeParse(value).success)
+    .slice(0, BULK_APPROVE_LIMIT);
+
+  if (ids.length === 0) return;
+
+  const { data: calls } = await db()
+    .from("service_calls")
+    .select("id, technician_id, routed_to_chief_id, approval_status")
+    .in("id", ids);
+
+  const allowed = (calls ?? [])
+    .filter((call) => call.approval_status === "pending")
+    .filter(
+      (call) =>
+        user.is_admin ||
+        (user.is_chief &&
+          call.routed_to_chief_id === user.id &&
+          call.technician_id !== user.id),
+    )
+    .map((call) => call.id);
+
+  if (allowed.length === 0) return;
+
+  await db()
+    .from("service_calls")
+    .update({
+      approval_status: "approved",
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .in("id", allowed);
+
+  revalidatePath("/");
+  revalidatePath("/calls");
+  for (const id of allowed) revalidatePath(`/calls/${id}`);
+}
+
 /**
  * Removes a service call outright, admin only.
  *

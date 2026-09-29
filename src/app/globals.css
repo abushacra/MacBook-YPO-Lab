@@ -104,3 +104,39 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/*
+ * Printing a report is how it becomes a PDF. The app chrome, the bottom nav and
+ * the controls go; the cards flatten to something that reads on paper and never
+ * breaks a person's block across two pages.
+ */
+@media print {
+  nav,
+  .btn,
+  .btn-primary,
+  .btn-secondary {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  .card {
+    border: 1px solid #d4d4d8;
+    border-radius: 0;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .chip {
+    border: 1px solid #d4d4d8;
+    background: #fff !important;
+    color: #000 !important;
+  }
+}

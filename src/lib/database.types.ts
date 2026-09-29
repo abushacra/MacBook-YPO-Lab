@@ -409,6 +409,16 @@ export type Database = {
         }
         Relationships: []
       }
+      technician_usage: {
+        Row: {
+          technician_id: string | null
+          service_call_count: number | null
+          expense_count: number | null
+          reports_count: number | null
+          pending_routed_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

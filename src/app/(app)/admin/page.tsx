@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import {
   deleteProperty,
+  deleteTechnician,
   deleteSpace,
   resetTechnicianPin,
   setTechnicianChief,
@@ -37,9 +38,14 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold">Admin</h1>
-        <Link href="/payrun" className="btn-secondary min-h-11 px-4 text-sm">
-          Pay run
-        </Link>
+        <div className="flex shrink-0 gap-2">
+          <Link href="/reports" className="btn-secondary min-h-11 px-3 text-sm">
+            Report
+          </Link>
+          <Link href="/payrun" className="btn-secondary min-h-11 px-3 text-sm">
+            Pay run
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -216,7 +222,7 @@ function countLabel(count: number, noun: string): string {
 
 /** Loads the roster and resolves lockouts outside of render, which must stay pure. */
 async function loadPeople() {
-  const [{ data }, { data: rates }] = await Promise.all([
+  const [{ data }, { data: rates }, { data: usage }] = await Promise.all([
     db()
       .from("technicians")
       .select("id, name, company, kind, is_admin, is_chief, chief_id, active, pin_hash, locked_until")
@@ -225,12 +231,22 @@ async function loadPeople() {
       .from("technician_rates")
       .select("technician_id, label, amount, sort_order, is_primary")
       .order("sort_order"),
+    db()
+      .from("technician_usage")
+      .select("technician_id, service_call_count, expense_count, reports_count"),
   ]);
+
+  const usageById = new Map((usage ?? []).map((row) => [row.technician_id, row]));
 
   const now = Date.now();
   return (data ?? []).map((person) => ({
     ...person,
     locked: person.locked_until != null && new Date(person.locked_until).getTime() > now,
+    used: {
+      calls: usageById.get(person.id)?.service_call_count ?? 0,
+      receipts: usageById.get(person.id)?.expense_count ?? 0,
+      reports: usageById.get(person.id)?.reports_count ?? 0,
+    },
     rates: (rates ?? [])
       .filter((rate) => rate.technician_id === person.id)
       .map((rate) => ({
@@ -262,6 +278,18 @@ async function PeopleTab({ adminId }: { adminId: string }) {
           {people.map((person) => {
             const { locked } = person;
             const isSelf = person.id === adminId;
+            /*
+             * Deleting is only for someone who was never really used. Calls and
+             * receipts are RESTRICT in the database so the delete would fail;
+             * people reporting to them would succeed and quietly leave those
+             * people with no chief, which is why it is blocked here too. The
+             * action re-checks all of this server side.
+             */
+            const deletable =
+              !isSelf &&
+              person.used.calls === 0 &&
+              person.used.receipts === 0 &&
+              person.used.reports === 0;
 
             return (
               <li key={person.id} className="card p-4">
@@ -355,9 +383,39 @@ async function PeopleTab({ adminId }: { adminId: string }) {
                           {person.active ? "Deactivate" : "Reactivate"}
                         </button>
                       </form>
+
+                      {deletable && (
+                        <form action={deleteTechnician}>
+                          <input type="hidden" name="id" value={person.id} />
+                          <ConfirmButton confirmLabel="Tap again to delete">
+                            Delete
+                          </ConfirmButton>
+                        </form>
+                      )}
                     </>
                   )}
                 </div>
+
+                {person.id !== adminId &&
+                  (deletable ? (
+                    <p className="mt-2 text-xs text-muted">
+                      Nothing is logged against {person.name}, so they can be deleted
+                      outright. Anyone who has logged work can only be deactivated.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted">
+                      {[
+                        person.used.calls > 0 && countLabel(person.used.calls, "service call"),
+                        person.used.receipts > 0 && countLabel(person.used.receipts, "receipt"),
+                        person.used.reports > 0 &&
+                          `${countLabel(person.used.reports, "person")} reporting to them`,
+                      ]
+                        .filter((part): part is string => typeof part === "string")
+                        .join(", ")}{" "}
+                      — so this person can be deactivated but not deleted. Deactivating
+                      blocks sign-in and takes them off every list, and keeps the record.
+                    </p>
+                  ))}
 
                 {!person.is_chief && chiefs.length > 0 && (
                   <ChiefSelect

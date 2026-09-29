@@ -75,6 +75,28 @@ The database enforces the structure independently: only in-house engineers can
 be chiefs, a reporting line must point at an actual chief, nobody reports to
 themselves, and a chief cannot be untagged while people still report to them.
 
+### Deleting a person
+
+An admin gets a **Delete** control on anyone with nothing logged against them —
+a duplicate, a typo, a test account — behind a two-tap confirmation. Everyone
+else can only be **deactivated**, which blocks sign-in and takes them off every
+list while keeping their history.
+
+Three things block a delete, and the action re-checks all of them server side:
+
+| Blocked by | Enforced by |
+| --- | --- |
+| service calls they logged | `RESTRICT` on the foreign key |
+| receipts they logged | `RESTRICT` on the foreign key |
+| people reporting to them as chief | the app — the column is only `SET NULL`, so the database would let it through and quietly leave those people with no chief |
+
+An admin also cannot delete themselves. Rate tiers and push subscriptions cascade
+away with the person; `reviewed_by` and `routed_to_chief_id` on other people's
+calls are set null.
+
+The `technician_usage` view is what the admin screen reads to decide which
+control to show, and to say why when the answer is no.
+
 ### Deleting a service call
 
 An admin gets a **Delete service call** control at the bottom of any service call, behind a
@@ -137,6 +159,40 @@ one with:
 ```bash
 node -e "console.log(require('web-push').generateVAPIDKeys())"
 ```
+
+## Approving in bulk
+
+The **To approve** filter on the Service Calls screen puts a checkbox on every
+call the signed-in person may sign off, with a Select all control and a sticky
+**Approve N service calls** button. The action re-checks every id server side
+against the same rule as a single approval — a chief only what was routed to
+them and never their own work, an admin anything — so a tampered form cannot
+approve something it should not. Ids that fail, or that someone else already
+reviewed, are dropped rather than failing the whole batch. One approval covers at
+most 200 calls.
+
+## Service call report
+
+**Admin → Report** takes a date range and totals every service call in it by the
+person who logged it, with a subtotal per property underneath them, plus a count
+per Service Call Charge, how many are still awaiting approval and how many have
+no amount.
+
+Unlike a pay run this counts **everything in range, approved or not** — it is a
+record of work done rather than an instruction to pay.
+
+- **Download Excel** gives a real `.xlsx`. It is written by `src/lib/xlsx.ts`, a
+  small ZIP-and-XML writer, rather than a spreadsheet dependency: the whole
+  surface used is four cell shapes on one sheet. Property rows are indented under
+  their engineer rather than grouped or merged, so the hierarchy survives a sort
+  or a copy-paste.
+- **Print / save PDF** uses the browser's own print dialog, which every phone and
+  desktop can save as a PDF. `@media print` in `globals.css` drops the nav and
+  the buttons and stops a person's block splitting across pages.
+
+A call covering two properties is counted **once, under the first**, the same
+choice the pay run makes — so the property subtotals always add up to the
+engineer's total. The count of such calls is shown at the foot.
 
 ## Pay run — bills for QuickBooks Online
 

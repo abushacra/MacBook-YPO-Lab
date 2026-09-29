@@ -5,6 +5,8 @@ import { db } from "@/lib/supabase";
 import { formatDate, formatLocation, formatMoney, isUuid } from "@/lib/format";
 import { ApprovalBadge, CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
 import { PropertyFilter } from "@/components/property-filter";
+import { ApprovalSelection } from "@/components/approval-selection";
+import { approveServiceCalls } from "@/lib/actions/calls";
 
 export const metadata = { title: "Service calls · Kapa Service Log" };
 
@@ -12,6 +14,24 @@ const PAGE_SIZE = 50;
 
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
+/** The list is the same either way; only the To approve view gets a form around it. */
+function Bulk({
+  enabled,
+  total,
+  children,
+}: {
+  enabled: boolean;
+  total: number;
+  children: React.ReactNode;
+}) {
+  if (!enabled) return <>{children}</>;
+  return (
+    <ApprovalSelection action={approveServiceCalls} total={total}>
+      {children}
+    </ApprovalSelection>
+  );
 }
 
 export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
@@ -67,6 +87,18 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   );
 
   const canReview = user.is_chief || user.is_admin;
+
+  /**
+   * Which of these the signed-in person may sign off, by the same rule the
+   * action re-checks server side: an admin anything, a chief only what was
+   * routed to them and never their own work.
+   */
+  const canApprove = (call: { technician_id: string; routed_to_chief_id: string | null }) =>
+    user.is_admin ||
+    (user.is_chief && call.routed_to_chief_id === user.id && call.technician_id !== user.id);
+
+  const selectable =
+    scope === "to_approve" ? (calls ?? []).filter(canApprove) : [];
   const scopes = [
     { value: "all", label: "All" },
     { value: "mine", label: "Mine" },
@@ -89,7 +121,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
           role="status"
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
         >
-          Shift deleted.
+          Service call deleted.
         </p>
       )}
 
@@ -132,10 +164,23 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
       )}
 
       {calls && calls.length > 0 ? (
+        <Bulk enabled={selectable.length > 0} total={selectable.length}>
         <ul className="space-y-2">
           {calls.map((call) => (
-            <li key={call.id}>
-              <Link href={`/calls/${call.id}`} className="card block px-4 py-3 active:bg-brand-50">
+            <li key={call.id} className="flex items-stretch gap-2">
+              {selectable.length > 0 && (
+                <label className="flex shrink-0 cursor-pointer items-center px-1">
+                  <input
+                    type="checkbox"
+                    name="call_ids"
+                    value={call.id}
+                    disabled={!canApprove(call)}
+                    aria-label={`Select the ${formatDate(call.call_date, { weekday: undefined })} call at ${call.property_label}`}
+                    className="size-6 rounded accent-brand-600 disabled:opacity-30"
+                  />
+                </label>
+              )}
+              <Link href={`/calls/${call.id}`} className="card block flex-1 px-4 py-3 active:bg-brand-50">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-semibold">
                     {formatLocation(call.property_label, call.space_label)}
@@ -177,6 +222,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
             </li>
           ))}
         </ul>
+        </Bulk>
       ) : (
         <p className="card px-4 py-8 text-center text-sm text-muted">
           No service calls match this filter.
