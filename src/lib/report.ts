@@ -61,10 +61,36 @@ export type ReportPersonRow = {
   calls: ReportCallRow[];
 };
 
+/** One engineer's share of a property, in the by-property view. */
+export type ReportPropertyEngineer = {
+  technicianId: string;
+  name: string;
+  kind: string;
+  callCount: number;
+  amount: number;
+  unpricedCount: number;
+};
+
+/**
+ * A property with the engineers who attended it underneath — the by-engineer
+ * view turned on its head, for charging a property's customer and seeing who
+ * did the work there.
+ */
+export type ReportPropertyGroup = {
+  propertyId: string;
+  propertyName: string;
+  callCount: number;
+  amount: number;
+  unpricedCount: number;
+  engineers: ReportPropertyEngineer[];
+};
+
 export type ServiceCallReport = {
   from: string;
   to: string;
   people: ReportPersonRow[];
+  /** The same work grouped the other way: property first, engineers under it. */
+  properties: ReportPropertyGroup[];
   callCount: number;
   amount: number;
   unpricedCount: number;
@@ -217,10 +243,62 @@ export function groupReport(
     from,
     to,
     people: rows,
+    properties: byProperty(rows),
     callCount: Math.round(sum((person) => person.callCount) * 100) / 100,
     amount: Math.round(sum((person) => person.amount) * 100) / 100,
     unpricedCount: sum((person) => person.unpricedCount),
     pendingCount: sum((person) => person.pendingCount),
     secondPropertyCount: sum((person) => person.secondPropertyCount),
   };
+}
+
+/**
+ * Turns the by-engineer rows into by-property groups.
+ *
+ * Built from the same rows the other view shows rather than walking the calls
+ * again, so the two can never disagree: every figure here is a figure from
+ * there, added up in a different order.
+ */
+function byProperty(people: ReportPersonRow[]): ReportPropertyGroup[] {
+  const groups = new Map<string, ReportPropertyGroup>();
+
+  for (const person of people) {
+    for (const row of person.properties) {
+      let group = groups.get(row.propertyId);
+      if (group === undefined) {
+        group = {
+          propertyId: row.propertyId,
+          propertyName: row.propertyName,
+          callCount: 0,
+          amount: 0,
+          unpricedCount: 0,
+          engineers: [],
+        };
+        groups.set(row.propertyId, group);
+      }
+
+      group.callCount = Math.round((group.callCount + row.callCount) * 100) / 100;
+      group.amount = Math.round((group.amount + row.amount) * 100) / 100;
+      group.unpricedCount += row.unpricedCount;
+      group.engineers.push({
+        technicianId: person.technicianId,
+        name: person.name,
+        kind: person.kind,
+        callCount: row.callCount,
+        amount: row.amount,
+        unpricedCount: row.unpricedCount,
+      });
+    }
+  }
+
+  const byBusiest = <T extends { callCount: number }>(a: T, b: T) => b.callCount - a.callCount;
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      engineers: [...group.engineers].sort(
+        (a, b) => byBusiest(a, b) || a.name.localeCompare(b.name),
+      ),
+    }))
+    .sort((a, b) => byBusiest(a, b) || a.propertyName.localeCompare(b.propertyName));
 }

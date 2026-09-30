@@ -35,6 +35,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   const from = isDate(one(params.from)) ? one(params.from) : fallback.from;
   const to = isDate(one(params.to)) ? one(params.to) : fallback.to;
 
+  // Which way round to read it: engineer first, or property first.
+  const view = one(params.view) === "property" ? "property" : "engineer";
   const report = await buildReport(from, to);
   const range = `${formatDate(from, { weekday: undefined })} – ${formatDate(to, { weekday: undefined })}`;
 
@@ -47,12 +49,36 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <h1 className="mt-2 text-xl font-bold">Service call report</h1>
         <p className="mt-1 text-sm text-muted">
           Every service call in the range, totalled by engineer and subtotalled by
-          property underneath them, then every call listed by date. A x 1.5 call
-          counts as 1.5 service calls and a x 2 as 2.
+          property underneath them, then every call listed by date — or the other way
+          round, a property with the engineers who attended it. A x 1.5 call counts
+          as 1.5 service calls and a x 2 as 2.
         </p>
       </div>
 
+      <div className="flex gap-2 overflow-x-auto pb-1 print:hidden">
+        {[
+          { value: "engineer", label: "By engineer" },
+          { value: "property", label: "By property" },
+        ].map((option) => (
+          <Link
+            key={option.value}
+            href={`/reports?from=${from}&to=${to}${
+              option.value === "property" ? "&view=property" : ""
+            }`}
+            aria-current={view === option.value ? "true" : undefined}
+            className={`chip min-h-9 px-3.5 text-sm ${
+              view === option.value
+                ? "bg-brand-700 text-white"
+                : "border border-hairline bg-white text-muted"
+            }`}
+          >
+            {option.label}
+          </Link>
+        ))}
+      </div>
+
       <form action="/reports" className="card space-y-4 p-4 print:hidden">
+        <input type="hidden" name="view" value={view} />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="field-label" htmlFor="from">
@@ -74,7 +100,9 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
       {/* The printed page needs its own heading, since the one above is hidden. */}
       <div className="hidden print:block">
-        <h1 className="text-xl font-bold">Service calls by engineer</h1>
+        <h1 className="text-xl font-bold">
+          Service calls by {view === "property" ? "property" : "engineer"}
+        </h1>
         <p className="text-sm">{range}</p>
       </div>
 
@@ -102,6 +130,50 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
             <PrintButton />
           </div>
 
+          {view === "property" ? (
+            <ul className="space-y-3">
+              {report.properties.map((property) => (
+                <li key={property.propertyId} className="card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">{property.propertyName}</p>
+                      <p className="text-xs text-muted">
+                        {formatCalls(property.callCount)} service call
+                        {property.callCount === 1 ? "" : "s"} ·{" "}
+                        {property.engineers.length}{" "}
+                        {property.engineers.length === 1 ? "engineer" : "engineers"}
+                        {property.unpricedCount > 0 &&
+                          ` · ${property.unpricedCount} with no amount`}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-lg font-bold">{formatMoney(property.amount)}</p>
+                  </div>
+
+                  <ul className="mt-3 divide-y divide-hairline border-t border-hairline">
+                    {property.engineers.map((engineer) => (
+                      <li
+                        key={engineer.technicianId}
+                        className="flex items-center justify-between gap-3 py-2"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold">
+                            {engineer.name}
+                          </span>
+                          <span className="block text-xs text-muted">
+                            {formatCalls(engineer.callCount)} service call
+                            {engineer.callCount === 1 ? "" : "s"}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-sm font-bold">
+                          {formatMoney(engineer.amount)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          ) : (
           <ul className="space-y-3">
             {report.people.map((person) => (
               <li key={person.technicianId} className="card p-4">
@@ -189,10 +261,13 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
               </li>
             ))}
           </ul>
+          )}
 
           <div className="card flex items-center justify-between px-4 py-3">
             <div>
-              <p className="text-sm font-bold">All engineers</p>
+              <p className="text-sm font-bold">
+                {view === "property" ? "All properties" : "All engineers"}
+              </p>
               <p className="text-xs text-muted">
                 {formatCalls(report.callCount)} service call
                 {report.callCount === 1 ? "" : "s"}

@@ -237,13 +237,20 @@ the count and the money can never disagree about what x 1.5 means. The Detail
 sheet carries each call's weight in its own **Service calls** column, so the
 column can simply be summed to the summary figure.
 
+A **By engineer / By property** toggle switches which way round it reads. By
+property lists each property with the engineers who attended it and how many
+service calls each did — the companion to a pay run, for charging a property's
+customer. Its figures are the by-engineer figures added up in a different order,
+so the two views can never disagree. The Pay run screen links straight to it with
+the run's own dates.
+
 Underneath each engineer's summary comes **every call they logged, listed by
 date** — property and space, the second property if there was one, the Service
 Call Charge, emergency or scheduled, approval state, follow-up flag, amount and
 the description of the work.
 
-- **Download Excel** gives a real `.xlsx` with two sheets. **Summary** is the
-  blocks and subtotals; **Detail** is one row per call, oldest first within each
+- **Download Excel** gives a real `.xlsx` with three sheets. **By engineer** and
+  **By property** are the two summaries; **Detail** is one row per call, oldest first within each
   person, as a flat table with the engineer's name repeated on every row so Excel
   can sort, filter and pivot it. The file is written by `src/lib/xlsx.ts`, a small
   ZIP-and-XML writer, rather than a spreadsheet dependency: the whole surface used

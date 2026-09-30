@@ -10,9 +10,14 @@ import {
 import { usDate } from "@/lib/payrun-csv";
 
 /**
- * The service call report as a spreadsheet, in two sheets.
+ * The service call report as a spreadsheet, in three sheets.
  *
- * **Summary** is a block per person with their properties subtotalled underneath
+ * **By property** is the same work grouped the other way, for charging a
+ * property's customer: a property, then the engineers who attended it. Its
+ * figures come from the By engineer rows added up in a different order, so the
+ * two sheets can never disagree.
+ *
+ * **By engineer** is a block per person with their properties subtotalled underneath
  * and a grand total at the foot. The property rows under a person always add up
  * to that person's total, because a call covering two properties is counted once
  * — see `groupReport`.
@@ -28,9 +33,78 @@ import { usDate } from "@/lib/payrun-csv";
  */
 export function reportXlsx(report: ServiceCallReport): Uint8Array {
   return buildXlsx([
-    { name: "Summary", rows: summaryRows(report), columns: SUMMARY_COLUMNS },
+    { name: "By engineer", rows: summaryRows(report), columns: SUMMARY_COLUMNS },
+    { name: "By property", rows: propertyRows(report), columns: PROPERTY_COLUMNS },
     { name: "Detail", rows: detailRows(report), columns: DETAIL_COLUMNS },
   ]);
+}
+
+const PROPERTY_COLUMNS = [{ width: 38 }, { width: 13 }, { width: 13 }, { width: 11 }];
+
+/**
+ * The same work, property first. Every figure here is a figure from the By
+ * engineer sheet added up in a different order, so the two always agree — which
+ * is what makes this the sheet to charge a property's customer from.
+ */
+function propertyRows(report: ServiceCallReport): Cell[][] {
+  const rows: Cell[][] = [];
+
+  rows.push([{ value: "Service calls by property", style: "title" }]);
+  rows.push([{ value: `${usDate(report.from)} to ${usDate(report.to)}` }]);
+  rows.push([
+    {
+      value:
+        "Service calls counts every tier in one figure: a x 1.5 call counts as 1.5 and a x 2 as 2.",
+    },
+  ]);
+  rows.push([
+    { value: "Property / engineer", style: "bold" },
+    { value: "Service calls", style: "bold" },
+    { value: "Amount", style: "bold" },
+    { value: "No amount", style: "bold" },
+  ]);
+
+  for (const property of report.properties) {
+    rows.push([
+      { value: property.propertyName, style: "bold" },
+      { value: property.callCount, style: "bold" },
+      { value: property.amount, style: "boldMoney" },
+      { value: property.unpricedCount },
+    ]);
+
+    for (const engineer of property.engineers) {
+      rows.push([
+        { value: `    ${engineer.name}` },
+        { value: engineer.callCount },
+        { value: engineer.amount, style: "money" },
+        { value: engineer.unpricedCount },
+      ]);
+    }
+
+    rows.push([]);
+  }
+
+  rows.push([
+    { value: "All properties", style: "bold" },
+    { value: report.callCount, style: "bold" },
+    { value: report.amount, style: "boldMoney" },
+    { value: report.unpricedCount, style: "bold" },
+  ]);
+
+  if (report.secondPropertyCount > 0) {
+    rows.push([]);
+    rows.push([
+      {
+        value: `${report.secondPropertyCount} call${
+          report.secondPropertyCount === 1 ? "" : "s"
+        } also covered a second property, and ${
+          report.secondPropertyCount === 1 ? "is" : "are"
+        } counted once here, under the first. The second property is named on each call in the Detail sheet.`,
+      },
+    ]);
+  }
+
+  return rows;
 }
 
 const SUMMARY_COLUMNS = [{ width: 38 }, { width: 13 }, { width: 13 }, { width: 17 }, { width: 11 }];

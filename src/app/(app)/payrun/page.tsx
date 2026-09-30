@@ -143,6 +143,11 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
             Download bills CSV for QuickBooks
           </a>
 
+          {/* The other side of the same period: what each property was attended for. */}
+          <Link href={`/reports?from=${from}&to=${to}&view=property`} className="btn-secondary w-full">
+            Service calls by property for these dates
+          </Link>
+
           <section className="card p-4 text-sm">
             <h2 className="section-heading">Where these post in QuickBooks</h2>
             <dl className="mt-2 space-y-1 text-xs">
