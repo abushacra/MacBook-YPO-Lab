@@ -2,8 +2,7 @@ import Link from "next/link";
 
 import { requireAdmin } from "@/lib/auth";
 import { buildReport } from "@/lib/report";
-import { formatDate, formatMoney, todayISO } from "@/lib/format";
-import { HOURS_TYPE_LABELS } from "@/lib/constants";
+import { formatCalls, formatDate, formatMoney, todayISO } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
 import {
   ApprovalBadge,
@@ -16,11 +15,6 @@ export const metadata = { title: "Report · Kapa Service Log" };
 
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-}
-
-/** 1, 1.5, 2 — a whole number stays whole rather than reading 1.0. */
-function formatCalls(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function isDate(value: string): boolean {
@@ -122,16 +116,6 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                     </p>
                   </div>
                   <p className="shrink-0 text-lg font-bold">{formatMoney(person.amount)}</p>
-                </div>
-
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {(["regular", "after_hours", "double_time"] as const)
-                    .filter((charge) => person.byCharge[charge] > 0)
-                    .map((charge) => (
-                      <span key={charge} className="chip bg-slate-100 text-slate-600">
-                        {person.byCharge[charge]} × {HOURS_TYPE_LABELS[charge]}
-                      </span>
-                    ))}
                 </div>
 
                 <ul className="mt-3 divide-y divide-hairline border-t border-hairline">

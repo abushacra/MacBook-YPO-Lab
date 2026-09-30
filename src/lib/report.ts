@@ -56,7 +56,6 @@ export type ReportPersonRow = {
   pendingCount: number;
   /** Calls that also covered a second property, counted here on the first only. */
   secondPropertyCount: number;
-  byCharge: Record<HoursType, number>;
   properties: ReportPropertyRow[];
   /** Every call this person logged in the range, oldest first. */
   calls: ReportCallRow[];
@@ -132,7 +131,6 @@ export function groupReport(
         unpricedCount: 0,
         pendingCount: 0,
         secondPropertyCount: 0,
-        byCharge: { regular: 0, after_hours: 0, double_time: 0 },
         properties: [],
         calls: [],
         byProperty: new Map(),
@@ -181,7 +179,6 @@ export function groupReport(
     if (call.billed_amount === null) person.unpricedCount += 1;
     if (call.approval_status === "pending") person.pendingCount += 1;
     if (call.property_id_2 !== null) person.secondPropertyCount += 1;
-    person.byCharge[asHoursType(call.hours_type)] += 1;
 
     // The detail list: the call itself, for the day-by-day view under the
     // summary. Labels are resolved here so the screen and the spreadsheet read

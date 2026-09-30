@@ -60,3 +60,11 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
 }
+
+/**
+ * A weighted service call count: 1, 1.5, 2. A whole number stays whole rather
+ * than reading 1.0, and a half keeps its half.
+ */
+export function formatCalls(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}

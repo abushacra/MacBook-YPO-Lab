@@ -33,16 +33,7 @@ export function reportXlsx(report: ServiceCallReport): Uint8Array {
   ]);
 }
 
-const SUMMARY_COLUMNS = [
-  { width: 38 },
-  { width: 13 },
-  { width: 13 },
-  { width: 10 },
-  { width: 18 },
-  { width: 16 },
-  { width: 17 },
-  { width: 11 },
-];
+const SUMMARY_COLUMNS = [{ width: 38 }, { width: 13 }, { width: 13 }, { width: 17 }, { width: 11 }];
 
 function summaryRows(report: ServiceCallReport): Cell[][] {
   const rows: Cell[][] = [];
@@ -52,16 +43,13 @@ function summaryRows(report: ServiceCallReport): Cell[][] {
   rows.push([
     {
       value:
-        "A x 1.5 call counts as 1.5 service calls and a x 2 as 2, so Service calls can differ from the number of calls logged.",
+        "Service calls counts every tier in one figure: a x 1.5 call counts as 1.5 and a x 2 as 2. The Detail sheet shows what each call counted as.",
     },
   ]);
   rows.push([
     { value: "Engineer / property", style: "bold" },
     { value: "Service calls", style: "bold" },
     { value: "Amount", style: "bold" },
-    { value: "Regular", style: "bold" },
-    { value: HOURS_TYPE_LABELS.after_hours, style: "bold" },
-    { value: HOURS_TYPE_LABELS.double_time, style: "bold" },
     { value: "Awaiting approval", style: "bold" },
     { value: "No amount", style: "bold" },
   ]);
@@ -71,9 +59,6 @@ function summaryRows(report: ServiceCallReport): Cell[][] {
       { value: person.name, style: "bold" },
       { value: person.callCount, style: "bold" },
       { value: person.amount, style: "boldMoney" },
-      { value: person.byCharge.regular },
-      { value: person.byCharge.after_hours },
-      { value: person.byCharge.double_time },
       { value: person.pendingCount },
       { value: person.unpricedCount },
     ]);
@@ -86,9 +71,6 @@ function summaryRows(report: ServiceCallReport): Cell[][] {
         { value: property.callCount },
         { value: property.amount, style: "money" },
         { value: "" },
-        { value: "" },
-        { value: "" },
-        { value: "" },
         { value: property.unpricedCount },
       ]);
     }
@@ -100,9 +82,6 @@ function summaryRows(report: ServiceCallReport): Cell[][] {
     { value: "All engineers", style: "bold" },
     { value: report.callCount, style: "bold" },
     { value: report.amount, style: "boldMoney" },
-    { value: "" },
-    { value: "" },
-    { value: "" },
     { value: report.pendingCount, style: "bold" },
     { value: report.unpricedCount, style: "bold" },
   ]);

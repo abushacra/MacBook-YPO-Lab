@@ -209,19 +209,15 @@ record of work done rather than an instruction to pay.
 
 **A call counts as its Service Call Charge, not as one row.** Regular is one
 service call, x 1.5 is one and a half, x 2 is two — the same multiple the call
-was priced at, so the totals track the work rather than the number of forms
-filled in. Rudy's thirteen September calls, eight Regular and four at x 1.5 and
-one at x 2, come to **16 service calls**. The weight is `HOURS_TYPE_MULTIPLIERS`
-from `rates.ts`, shared with pricing so the two can never disagree.
+was priced at. Every tier lands in **one figure**: there is no per-tier
+breakdown, because 2 Regular, 3 at x 1.5 and 5 at x 2 is 16.5 service calls.
+Rudy's thirteen September calls, eight Regular and four at x 1.5 and one at x 2,
+come to **16**.
 
-The Regular / x 1.5 / x 2 columns stay as **counts of calls**, so they add up to
-the number logged rather than to the weighted figure — which is what makes the 13
-and the 16 both visible on one row. The Detail sheet carries the weight on every
-call in its own **Service calls** column, so the column can simply be summed.
-
-**The pay run is not weighted.** A bill line's Quantity is a count of the item
-being bought, and Quantity × Rate has to equal the Amount, so an x 2 call is one
-unit at twice the rate rather than two units.
+The weight is `HOURS_TYPE_MULTIPLIERS` from `rates.ts`, shared with pricing so
+the count and the money can never disagree about what x 1.5 means. The Detail
+sheet carries each call's weight in its own **Service calls** column, so the
+column can simply be summed to the summary figure.
 
 Underneath each engineer's summary comes **every call they logged, listed by
 date** — property and space, the second property if there was one, the Service
@@ -272,8 +268,8 @@ other, so a bill never mixes the two.
 | `*Type` | `Item Details` | `Item Details` | `Category Details` |
 | Posts to | `Kapa Service Call - Tech` | `Kapa Service Call - Supervisor` | `Reimbursable Expenses` |
 | Column | `Product/Service` | `Product/Service` | `Category/Account` |
-| `Quantity` / `Rate` | call count × per-call rate | call count × per-call rate | empty |
-| Lines per property | one per Service Call Charge | one per Service Call Charge | always one |
+| `Quantity` / `Rate` | weighted calls × Regular rate | weighted calls × Regular rate | empty |
+| Lines per property | always one | always one | always one |
 
 Every bill also carries `Limited - Kapa Capital` in `Location`, on the bill's
 first row, which is where the template puts bill-level fields.
@@ -287,14 +283,18 @@ engineer in Admin → People, times the Service Call Charge on the call.
 The four names live in `src/lib/quickbooks.ts` — change one there and it applies
 to the next download. Nothing is stored against bills already exported.
 
-An item row has to satisfy Quantity × Rate = Amount, so **an engineer's property
-worked at more than one Service Call Charge produces one line per charge**: two Regular
-service calls and one x 1.5 become a 2 × line and a 1 × line, each naming its charge in
-`Description`. Splitting is what keeps a line's amount from contradicting its own
-quantity and rate; the bill total is identical either way, and a property worked
-at a single charge all period stays one line. The rate is in the grouping key as
-well as the charge, so a tier an admin re-priced partway through a period cannot
-put two prices on one line.
+**The same weighting drives the bill**, which is what lets every charge tier share
+one line per property. Quantity is the weighted service call count and Rate is
+the **Regular** rate behind it, because a x 1.5 call at $195 is the same money as
+one and a half calls at $130. Rudy's eight calls at 14701 Flint Lee, six Regular
+and two at x 1.5, bill as a single `9 × 130.00 = 1,170.00` line rather than
+splitting into two rates. Quantity × Rate = Amount still holds on every row.
+
+The Regular rate is in the grouping key, so a tier an admin re-priced partway
+through a period still produces two lines. Each line's amount is the true sum of
+its calls rather than a recomputed Quantity × Rate, so the rounding in a rate
+like $133.33 — whose x 1.5 call was saved at $200.00 rather than $199.995 — can
+never reach anyone's pay.
 
 A category row carries an amount and nothing else, so **a vendor's service calls at one
 property always collapse onto a single line** however differently each job was

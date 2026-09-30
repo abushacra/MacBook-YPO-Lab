@@ -3,9 +3,8 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { buildPayRun, billNumber } from "@/lib/payrun";
 import { markPayRunBilled } from "@/lib/actions/payrun";
-import { formatDate, formatMoney, todayISO } from "@/lib/format";
+import { formatCalls, formatDate, formatMoney, todayISO } from "@/lib/format";
 import { ConfirmButton } from "@/components/confirm-button";
-import { HOURS_TYPE_LABELS } from "@/lib/constants";
 import {
   BILL_LOCATION,
   CHIEF_ITEM,
@@ -92,7 +91,8 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
             {formatDate(from, { weekday: undefined })} – {formatDate(to, { weekday: undefined })}
           </p>
           <p className="text-xs text-muted">
-            {payRun.shiftCount} service call{payRun.shiftCount === 1 ? "" : "s"} ·{" "}
+            {formatCalls(payRun.shiftCount)} service call
+            {payRun.shiftCount === 1 ? "" : "s"} ·{" "}
             {payRun.vendors.length} bill{payRun.vendors.length === 1 ? "" : "s"}
           </p>
         </div>
@@ -165,8 +165,8 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                   <div className="min-w-0">
                     <p className="truncate font-bold">{vendor.vendorName}</p>
                     <p className="text-xs text-muted">
-                      Bill {billNumber(to, index)} · {vendor.shiftCount} service call
-                      {vendor.shiftCount === 1 ? "" : "s"}
+                      Bill {billNumber(to, index)} · {formatCalls(vendor.shiftCount)} service
+                      call{vendor.shiftCount === 1 ? "" : "s"}
                     </p>
                     <p className="truncate text-xs text-muted">
                       {vendor.billAs === "item" ? "Item" : "Category"}: {vendor.billTarget}
@@ -180,7 +180,7 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                     <li
                       key={
                         line.billAs === "item"
-                          ? `${line.propertyId}-${line.hoursType}-${line.rate}`
+                          ? `${line.propertyId}-${line.rate}`
                           : line.propertyId
                       }
                       className="flex items-center justify-between gap-3 py-2"
@@ -192,12 +192,12 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                         <span className="block text-xs text-muted">
                           {line.billAs === "item" ? (
                             <>
-                              {line.shiftCount} &times; {formatMoney(line.rate)} &middot;{" "}
-                              {HOURS_TYPE_LABELS[line.hoursType]}
+                              {formatCalls(line.shiftCount)} &times; {formatMoney(line.rate)}
                             </>
                           ) : (
                             <>
-                              {line.shiftCount} shift{line.shiftCount === 1 ? "" : "s"}
+                              {formatCalls(line.shiftCount)} service call
+                              {line.shiftCount === 1 ? "" : "s"}
                             </>
                           )}
                         </span>
@@ -223,8 +223,8 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
           <section className="rounded-2xl border border-hairline bg-white p-4">
             <h2 className="text-sm font-bold">Once the bills are in QuickBooks</h2>
             <p className="mt-1 text-xs text-muted">
-              Marking this run billed stops these {payRun.shiftCount} service call
-              {payRun.shiftCount === 1 ? "" : "s"} appearing in a later run, so nobody is paid
+              Marking this run billed stops these {formatCalls(payRun.shiftCount)} service
+              call{payRun.shiftCount === 1 ? "" : "s"} appearing in a later run, so nobody is paid
               twice. Do it after the import succeeds, not before.
             </p>
             <form action={markPayRunBilled} className="mt-3">

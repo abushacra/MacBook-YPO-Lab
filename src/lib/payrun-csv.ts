@@ -1,6 +1,5 @@
 import type { PayRun } from "@/lib/payrun";
 import { billNumber } from "@/lib/payrun";
-import { HOURS_TYPE_LABELS } from "@/lib/constants";
 import { BILL_LOCATION } from "@/lib/quickbooks";
 
 /**
@@ -12,10 +11,10 @@ import { BILL_LOCATION } from "@/lib/quickbooks";
  * Bill Number leave them blank, which is how the importer groups lines onto one
  * bill.
  *
- * An in-house engineer's lines are "Item Details" rows: one service call is one
- * unit of the product, so Quantity is the call count, Rate is what a call was
- * billed at, and the Description carries only what no column already holds: the
- * Service Call Charge behind that rate, and the period. Writing Rate
+ * An in-house engineer's lines are "Item Details" rows. Quantity is the weighted
+ * service call count — a x 1.5 call counts as 1.5 and a x 2 as 2 — and Rate is
+ * the Regular rate behind them, so Quantity x Rate is the amount whatever mix of
+ * charges a property was worked at, and every tier shares one line. Writing Rate
  * and Amount on the row is what makes QuickBooks bill at the rate saved in this
  * app rather than the item's own cost.
  *
@@ -70,7 +69,11 @@ export function payRunCsv(payRun: PayRun): string {
 
     vendor.lines.forEach((line, lineIndex) => {
       const first = lineIndex === 0;
-      const calls = `${line.shiftCount} service call${line.shiftCount === 1 ? "" : "s"}`;
+      // 1, 1.5, 2 — a whole number stays whole rather than reading 1.0.
+      const count = Number.isInteger(line.shiftCount)
+        ? String(line.shiftCount)
+        : line.shiftCount.toFixed(1);
+      const calls = `${count} service call${line.shiftCount === 1 ? "" : "s"}`;
 
       /*
        * An item row prices each call, so it carries the product, the quantity
@@ -84,11 +87,11 @@ export function payRunCsv(payRun: PayRun): string {
               type: "Item Details",
               categoryAccount: "",
               productService: vendor.billTarget,
-              quantity: String(line.shiftCount),
+              quantity: count,
               rate: line.rate.toFixed(2),
               // Quantity and Rate are columns of their own on an item row, so
               // repeating them here just reads like the line is counted twice.
-              description: `${HOURS_TYPE_LABELS[line.hoursType]} \u2014 ${period}`,
+              description: `Service calls \u2014 ${period}`,
             }
           : {
               type: "Category Details",
