@@ -24,7 +24,8 @@ import { BILL_LOCATION } from "@/lib/quickbooks";
  * quoted at.
  *
  * Either way the line carries the property as Customer/Project with Billable
- * set, so it can be charged on for reimbursement.
+ * set, so it can be charged on for reimbursement, and its Description opens with
+ * that property so the bill reads without crossing to the Customer column.
  */
 
 export const BILL_CSV_HEADERS = [
@@ -89,9 +90,11 @@ export function payRunCsv(payRun: PayRun): string {
               productService: vendor.billTarget,
               quantity: count,
               rate: line.rate.toFixed(2),
-              // Quantity and Rate are columns of their own on an item row, so
-              // repeating them here just reads like the line is counted twice.
-              description: `Service calls \u2014 ${period}`,
+              // The property leads, so a bill reads property by property without
+              // crossing to the Customer column. Quantity and Rate are columns
+              // of their own, so repeating them here would only read like the
+              // line was counted twice.
+              description: `${line.customerName} \u00b7 Service calls \u2014 ${period}`,
             }
           : {
               type: "Category Details",
@@ -100,7 +103,7 @@ export function payRunCsv(payRun: PayRun): string {
               quantity: "",
               rate: "",
               // A category row has no Quantity column, so the count belongs here.
-              description: `${calls} \u2014 ${period}`,
+              description: `${line.customerName} \u00b7 ${calls} \u2014 ${period}`,
             };
 
       rows.push(

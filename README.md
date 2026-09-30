@@ -281,7 +281,9 @@ Download gives a CSV matching Intuit's `sample_bills_import` template exactly:
 the same nineteen headers, a UTF-8 BOM, CRLF endings and MM/DD/YYYY dates.
 Bill-level fields sit on a bill's first row only; later rows repeat the Bill
 Number, which is how the importer groups lines onto one bill. Every line carries
-`Billable` TRUE and the property in `Customer/Project`.
+`Billable` TRUE and the property in `Customer/Project`, and opens its
+`Description` with that property so the bill reads property by property without
+crossing to the Customer column.
 
 ### Two kinds of line
 
