@@ -159,6 +159,19 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
               value={formatMoney(call.billed_amount)}
             />
           )}
+        {/*
+          * Paid means this call was on a pay run an admin marked billed, so it
+          * has gone to payroll and will not appear on a later run. Shown to
+          * everyone — knowing whether your own work has been paid is not a rate.
+          */}
+        <Row
+          label="Paid"
+          value={
+            call.billed_at
+              ? `Yes · ${formatDate(call.billed_at.slice(0, 10), { weekday: undefined })}`
+              : "Not yet"
+          }
+        />
       </dl>
 
       {call.description && (

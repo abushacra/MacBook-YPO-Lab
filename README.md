@@ -186,6 +186,24 @@ can then approve it, because the separation rule only stops a chief approving a
 call whose *subject* is themselves. If entering and approving should be two
 different people, that rule is one line in `reviewServiceCall`.
 
+## Paid and unpaid
+
+The Service Calls screen has a **Unpaid / Paid / Paid & unpaid** filter, and
+**Unpaid is the default**. Unpaid is the working list — what still has to be
+approved, chased or paid — while a paid call is a finished record.
+
+Paid means `billed_at` is set, which happens when an admin marks a pay run
+billed. It is exactly the condition a pay run uses to decide what to pick up, so
+the unpaid list and the next pay run always agree about what is outstanding.
+
+The filter composes with the scope and property filters rather than resetting
+them, a **Paid** chip appears on each paid call in the list, and the detail screen
+shows Paid with the date. It is visible to everyone: knowing whether your own
+work has been paid is not a pay rate.
+
+Because the default changed, a screen that used to show everything now shows only
+what is outstanding. **Paid & unpaid** brings the rest back.
+
 ## Approving in bulk
 
 The **To approve** filter on the Service Calls screen puts a checkbox on every

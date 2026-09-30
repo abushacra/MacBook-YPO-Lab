@@ -3,7 +3,13 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { formatDate, formatLocation, formatMoney, isUuid } from "@/lib/format";
-import { ApprovalBadge, CallTypeBadge, FollowUpBadge, HoursBadge } from "@/components/call-badges";
+import {
+  ApprovalBadge,
+  CallTypeBadge,
+  FollowUpBadge,
+  HoursBadge,
+  PaidBadge,
+} from "@/components/call-badges";
 import { PropertyFilter } from "@/components/property-filter";
 import { ApprovalSelection } from "@/components/approval-selection";
 import { approveServiceCalls } from "@/lib/actions/calls";
@@ -11,6 +17,12 @@ import { approveServiceCalls } from "@/lib/actions/calls";
 export const metadata = { title: "Service calls · Kapa Service Log" };
 
 const PAGE_SIZE = 50;
+
+const PAID_FILTERS = [
+  { value: "unpaid", label: "Unpaid" },
+  { value: "paid", label: "Paid" },
+  { value: "all", label: "Paid & unpaid" },
+] as const;
 
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -38,17 +50,28 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   const user = await requireUser();
   const params = await searchParams;
   const scope = one(params.scope) || "all";
+  /*
+   * Paid means the call was on a pay run an admin marked billed. Unpaid is the
+   * default view because that is the working list — what still has to be
+   * approved, chased or paid — while paid calls are a finished record.
+   */
+  const paid = PAID_FILTERS.some((option) => option.value === one(params.paid))
+    ? one(params.paid)
+    : "unpaid";
   const propertyId = one(params.property);
   const justDeleted = one(params.deleted) === "1";
 
   let query = db()
     .from("service_calls")
     .select(
-      "id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, description, follow_up_needed, technician_id, billed_amount, approval_status, routed_to_chief_id",
+      "id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, description, follow_up_needed, technician_id, billed_amount, approval_status, routed_to_chief_id, billed_at",
     )
     .order("call_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(PAGE_SIZE);
+
+  if (paid === "unpaid") query = query.is("billed_at", null);
+  if (paid === "paid") query = query.not("billed_at", "is", null);
 
   if (scope === "mine") query = query.eq("technician_id", user.id);
   if (scope === "follow_up") query = query.eq("follow_up_needed", true);
@@ -106,9 +129,13 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
     ...(canReview ? [{ value: "to_approve", label: "To approve" }] : []),
   ];
 
-  const hrefFor = (nextScope: string) => {
+  /** Every filter keeps the others, so changing one never silently resets the rest. */
+  const hrefFor = (next: { scope?: string; paid?: string }) => {
     const search = new URLSearchParams();
+    const nextScope = next.scope ?? scope;
+    const nextPaid = next.paid ?? paid;
     if (nextScope !== "all") search.set("scope", nextScope);
+    if (nextPaid !== "unpaid") search.set("paid", nextPaid);
     if (propertyId) search.set("property", propertyId);
     const query = search.toString();
     return query ? `/calls?${query}` : "/calls";
@@ -136,7 +163,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
         {scopes.map((option) => (
           <Link
             key={option.value}
-            href={hrefFor(option.value)}
+            href={hrefFor({ scope: option.value })}
             aria-current={scope === option.value ? "true" : undefined}
             className={`chip min-h-9 px-3.5 text-sm ${
               scope === option.value
@@ -149,11 +176,31 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
         ))}
       </div>
 
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {PAID_FILTERS.map((option) => (
+          <Link
+            key={option.value}
+            href={hrefFor({ paid: option.value })}
+            aria-current={paid === option.value ? "true" : undefined}
+            className={`chip min-h-9 px-3.5 text-sm ${
+              paid === option.value
+                ? "bg-sky-700 text-white"
+                : "border border-hairline bg-white text-muted"
+            }`}
+          >
+            {option.label}
+          </Link>
+        ))}
+      </div>
+
       <PropertyFilter
         properties={properties ?? []}
         value={propertyId}
         basePath="/calls"
-        extraParams={scope !== "all" ? { scope } : {}}
+        extraParams={{
+          ...(scope !== "all" ? { scope } : {}),
+          ...(paid !== "unpaid" ? { paid } : {}),
+        }}
       />
 
       {user.is_admin && billableTotal > 0 && (
@@ -212,6 +259,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                   {call.approval_status !== "approved" && (
                     <ApprovalBadge value={call.approval_status} />
                   )}
+                  {call.billed_at !== null && <PaidBadge />}
                   <span className="ml-auto text-xs text-muted">
                     {call.technician_id === user.id
                       ? "You"
@@ -226,6 +274,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
       ) : (
         <p className="card px-4 py-8 text-center text-sm text-muted">
           No service calls match this filter.
+          {paid === "unpaid" && " Everything here may already have been paid — try Paid & unpaid."}
         </p>
       )}
 

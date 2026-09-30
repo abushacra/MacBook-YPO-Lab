@@ -45,3 +45,11 @@ export function ApprovalBadge({ value }: { value: string }) {
 
   return <span className={`chip ${APPROVAL_TONES[status]}`}>{APPROVAL_LABELS[status]}</span>;
 }
+
+/**
+ * Paid means the service call was on a pay run that an admin marked billed, so
+ * it has gone to payroll and will not appear on a later run.
+ */
+export function PaidBadge() {
+  return <span className="chip bg-sky-100 text-sky-800">Paid</span>;
+}
