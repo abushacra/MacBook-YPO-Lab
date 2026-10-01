@@ -323,6 +323,9 @@ names live in `src/lib/quickbooks.ts` beside the bill ones:
 | Location | `Limited - Kapa Capital` |
 | Payee, every expense | `Credit Card Purchase` |
 
+The `Memo` carries the Ref No., then the merchant, then who logged it, so a card
+statement can be reconciled from that column alone.
+
 Every expense is paid to **one payee for the card** rather than a vendor per
 shop: the card is what was paid, and the shop is a detail of the charge. The
 merchant is not lost — it leads the `Description`, ahead of the app's own

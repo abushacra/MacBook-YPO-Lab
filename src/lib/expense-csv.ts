@@ -103,9 +103,12 @@ export function expenseCsv(report: ReceiptsReport): string {
         usDate(receipt.date),
         EXPENSE_PAYMENT_METHOD,
         BILL_LOCATION,
-        // The ref again, so the expense can be found from the receipt file and
-        // back without opening the line.
-        `${ref} · logged by ${receipt.loggedBy}`,
+        // The ref, so the expense can be found from the receipt file and back
+        // without opening the line, then the merchant, so a statement can be
+        // reconciled from the memo column alone.
+        [ref, receipt.merchant, `logged by ${receipt.loggedBy}`]
+          .filter((part): part is string => Boolean(part))
+          .join(" · "),
         "Category Details",
         EXPENSE_CATEGORY,
         "", // Product/Service — not an item line
