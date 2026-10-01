@@ -7,6 +7,7 @@ import { EMPTY_FORM_STATE } from "@/lib/form-state";
 import { EXPENSE_CATEGORIES } from "@/lib/constants";
 import { deviceTodayISO } from "@/lib/format";
 import { Field, FormError } from "@/components/field";
+import { Segmented } from "@/components/segmented";
 import { MediaUploader } from "@/components/media-uploader";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -34,7 +35,23 @@ export function ExpenseForm({
 
   return (
     <form action={formAction} className="space-y-6">
-      <Field label="Amount charged" htmlFor="amount" required error={errors.amount}>
+      {/*
+        * A return is chosen rather than typed as a minus sign: a lone "-" is easy
+        * to miss on a phone and easy to leave off, and the amount is the same
+        * either way. The action applies the sign.
+        */}
+      <Field label="Charge or return" required>
+        <Segmented
+          name="kind"
+          defaultValue="charge"
+          options={[
+            { value: "charge", label: "Charge" },
+            { value: "return", label: "Return", tone: "amber" },
+          ]}
+        />
+      </Field>
+
+      <Field label="Amount" htmlFor="amount" required error={errors.amount}>
         <div className="relative">
           <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-xl font-bold text-muted">
             $

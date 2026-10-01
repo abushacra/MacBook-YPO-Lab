@@ -75,6 +75,25 @@ The database enforces the structure independently: only in-house engineers can
 be chiefs, a reporting line must point at an actual chief, nobody reports to
 themselves, and a chief cannot be untagged while people still report to them.
 
+### Receipts and returns
+
+A receipt is logged by a chief or an admin. The form asks **Charge or return**
+before the amount: a return is entered as the ordinary positive amount with
+Return chosen, and the sign is applied on the server. A minus sign typed into the
+amount works too, and choosing Return never flips it back to a charge.
+
+A return is stored as a negative amount, so it nets off the charge it reverses in
+every total. The database constraint moved from `amount > 0` to `amount <> 0`,
+so zero is still refused — a receipt for nothing is a mistake, not a return. The
+list shows a **Return** chip and the amount in green.
+
+**Deleting a receipt** is offered to an admin for any receipt, and to a chief for
+their own only, behind a two-tap confirmation. The stored image or PDF is removed
+from storage before the row, so a failed delete cannot leave an orphaned file;
+a failure clearing storage is swallowed, because an orphaned file is better than
+a receipt that will not delete. A linked service call is untouched — the work
+happened whatever became of the receipt.
+
 ### Deleting a person
 
 An admin gets a **Delete** control on anyone with nothing logged against them —

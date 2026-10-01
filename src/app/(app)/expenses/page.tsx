@@ -6,6 +6,8 @@ import { canLogReceipts, requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { formatDate, formatMoney } from "@/lib/format";
 import { PropertyFilter } from "@/components/property-filter";
+import { ConfirmButton } from "@/components/confirm-button";
+import { deleteExpense } from "@/lib/actions/expenses";
 
 export const metadata = { title: "Receipts · Kapa Service Log" };
 
@@ -23,6 +25,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
   const scope = one(params.scope) || "all";
   const propertyId = one(params.property);
   const justSaved = one(params.saved) === "1";
+  const justDeleted = one(params.deleted) === "1";
 
   let query = db()
     .from("expenses")
@@ -62,6 +65,15 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
         </p>
       )}
 
+      {justDeleted && (
+        <p
+          role="status"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
+        >
+          Receipt deleted.
+        </p>
+      )}
+
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold">Receipts</h1>
         <Link href="/expenses/new" className="btn-primary min-h-11 px-4 text-sm">
@@ -97,7 +109,10 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
       />
 
       <div className="card flex items-center justify-between px-4 py-3">
-        <span className="text-sm font-semibold text-muted">Total shown</span>
+        <span className="text-sm font-semibold text-muted">
+          Total shown
+          <span className="block text-xs font-normal">Returns net off the charges</span>
+        </span>
         <span className="text-lg font-bold">{formatMoney(total)}</span>
       </div>
 
@@ -112,11 +127,21 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                   </p>
                   <p className="truncate text-xs text-muted">{expense.property_label}</p>
                 </div>
-                <p className="shrink-0 text-base font-bold">{formatMoney(expense.amount)}</p>
+                {/* A return reads as a credit, in its own colour, not as a charge. */}
+                <p
+                  className={`shrink-0 text-base font-bold ${
+                    expense.amount < 0 ? "text-emerald-700" : ""
+                  }`}
+                >
+                  {formatMoney(expense.amount)}
+                </p>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span>{formatDate(expense.expense_date, { weekday: undefined })}</span>
+                {expense.amount < 0 && (
+                  <span className="chip bg-emerald-100 text-emerald-800">Return</span>
+                )}
                 {expense.category && (
                   <span className="chip bg-slate-100 text-slate-700">{expense.category}</span>
                 )}
@@ -138,6 +163,17 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                     : (nameById.get(expense.technician_id) ?? "Unknown")}
                 </span>
               </div>
+
+              {/*
+                * An admin may delete any receipt; a chief only their own. The
+                * action re-checks both, so this only decides what is offered.
+                */}
+              {(user.is_admin || expense.technician_id === user.id) && (
+                <form action={deleteExpense} className="mt-2">
+                  <input type="hidden" name="id" value={expense.id} />
+                  <ConfirmButton confirmLabel="Tap again to delete">Delete</ConfirmButton>
+                </form>
+              )}
             </li>
           ))}
         </ul>
