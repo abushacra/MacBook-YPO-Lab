@@ -39,9 +39,8 @@ export const EXPENSE_PAYMENT_METHOD = "Credit Card";
 export const EXPENSE_CATEGORY = "Reimbursable Expenses";
 
 /**
- * Who the expense was paid to when a receipt has no merchant on it. Payee is a
- * required column, so a blank would fail the import; this keeps the row and
- * makes the gap obvious in one place in QuickBooks rather than losing the
- * charge.
+ * Who every credit card expense is paid to. One payee for the whole card rather
+ * than a vendor per merchant: the card is what was paid, and the shop is a
+ * detail of the charge, which rides in the Description instead.
  */
-export const EXPENSE_FALLBACK_PAYEE = "Credit Card Purchase";
+export const EXPENSE_PAYEE = "Credit Card Purchase";

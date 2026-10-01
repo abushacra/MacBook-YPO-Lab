@@ -3,7 +3,7 @@ import { usDate } from "@/lib/payrun-csv";
 import {
   BILL_LOCATION,
   EXPENSE_CATEGORY,
-  EXPENSE_FALLBACK_PAYEE,
+  EXPENSE_PAYEE,
   EXPENSE_PAYMENT_ACCOUNT,
   EXPENSE_PAYMENT_METHOD,
 } from "@/lib/quickbooks";
@@ -16,6 +16,9 @@ import {
  * headers in the same order, a UTF-8 BOM, CRLF line endings and MM/DD/YYYY
  * dates. Each receipt is one expense with one Category Details line, carrying
  * the property in Customer/Project with Billable set so it can be charged on.
+ *
+ * Every row is paid to one payee for the card rather than a vendor per shop, so
+ * the merchant is recorded in the Description instead.
  *
  * A return is a receipt with a negative amount and imports as a negative one,
  * which is how QuickBooks records a credit back to the card.
@@ -78,9 +81,13 @@ export function expenseCsv(report: ReceiptsReport): string {
   const rows: string[] = [EXPENSE_CSV_HEADERS.map(csvCell).join(",")];
 
   for (const { ref, receipt, group } of numberedReceipts(report)) {
-    // What the charge was for, keeping the app's own category and note — neither
-    // has a column of its own on an expense row.
+    /*
+     * What the charge was for. The merchant leads, because every row is paid to
+     * the one card payee and this is where the shop is recorded; the app's own
+     * category and note follow, neither having a column of its own here.
+     */
     const description = [
+      receipt.merchant,
       receipt.category,
       receipt.notes,
       receipt.amount < 0 ? "Return" : null,
@@ -91,7 +98,7 @@ export function expenseCsv(report: ReceiptsReport): string {
     rows.push(
       [
         ref,
-        receipt.merchant ?? EXPENSE_FALLBACK_PAYEE,
+        EXPENSE_PAYEE,
         EXPENSE_PAYMENT_ACCOUNT,
         usDate(receipt.date),
         EXPENSE_PAYMENT_METHOD,

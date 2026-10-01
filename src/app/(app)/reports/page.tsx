@@ -8,7 +8,7 @@ import { PrintButton } from "@/components/print-button";
 import {
   BILL_LOCATION,
   EXPENSE_CATEGORY,
-  EXPENSE_FALLBACK_PAYEE,
+  EXPENSE_PAYEE,
   EXPENSE_PAYMENT_ACCOUNT,
   EXPENSE_PAYMENT_METHOD,
 } from "@/lib/quickbooks";
@@ -166,11 +166,11 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
               <section className="card p-4 text-sm print:hidden">
                 <h2 className="section-heading">Where these post in QuickBooks</h2>
                 <dl className="mt-2 space-y-1 text-xs">
+                  <MapRow label="Payee, every expense" value={EXPENSE_PAYEE} />
                   <MapRow label="Payment account" value={EXPENSE_PAYMENT_ACCOUNT} />
                   <MapRow label="Payment method" value={EXPENSE_PAYMENT_METHOD} />
                   <MapRow label="Category" value={EXPENSE_CATEGORY} />
                   <MapRow label="Location, every expense" value={BILL_LOCATION} />
-                  <MapRow label="Payee, when none on the receipt" value={EXPENSE_FALLBACK_PAYEE} />
                 </dl>
                 <p className="mt-3 text-xs text-muted">
                   The download is a ZIP: the expense import CSV, the receipt images each

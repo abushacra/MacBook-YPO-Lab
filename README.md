@@ -321,11 +321,12 @@ names live in `src/lib/quickbooks.ts` beside the bill ones:
 | Payment method | `Credit Card` |
 | Category | `Reimbursable Expenses` |
 | Location | `Limited - Kapa Capital` |
-| Payee, when the receipt has none | `Credit Card Purchase` |
+| Payee, every expense | `Credit Card Purchase` |
 
-`*Payee` is a required column, so a receipt with no merchant would fail the
-import. It falls back rather than being dropped, which keeps the charge and puts
-the gap in one obvious place in QuickBooks.
+Every expense is paid to **one payee for the card** rather than a vendor per
+shop: the card is what was paid, and the shop is a detail of the charge. The
+merchant is not lost — it leads the `Description`, ahead of the app's own
+category and note.
 
 ## Pay run — bills for QuickBooks Online
 
