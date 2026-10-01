@@ -28,3 +28,20 @@ export function billTarget(kind: string, isChief: boolean): string {
   if (kind === "vendor") return VENDOR_EXPENSE_CATEGORY;
   return isChief ? CHIEF_ITEM : ENGINEER_ITEM;
 }
+
+/** The card the receipts were paid from, for the expense import. */
+export const EXPENSE_PAYMENT_ACCOUNT = "KPC Chase (autopay)";
+
+/** How those expenses were paid, in QuickBooks' own wording. */
+export const EXPENSE_PAYMENT_METHOD = "Credit Card";
+
+/** The account a credit card receipt is posted to. */
+export const EXPENSE_CATEGORY = "Reimbursable Expenses";
+
+/**
+ * Who the expense was paid to when a receipt has no merchant on it. Payee is a
+ * required column, so a blank would fail the import; this keeps the row and
+ * makes the gap obvious in one place in QuickBooks rather than losing the
+ * charge.
+ */
+export const EXPENSE_FALLBACK_PAYEE = "Credit Card Purchase";

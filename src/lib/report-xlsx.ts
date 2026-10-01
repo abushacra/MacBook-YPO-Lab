@@ -1,4 +1,5 @@
 import type { ServiceCallReport } from "@/lib/report";
+import type { ReceiptsReport } from "@/lib/receipts-report";
 import { buildXlsx, type Cell } from "@/lib/xlsx";
 import {
   APPROVAL_LABELS,
@@ -31,12 +32,102 @@ import { usDate } from "@/lib/payrun-csv";
  * 1, 1.5 or 2 by its Service Call Charge — so the column adds up to the figure
  * on the summary.
  */
-export function reportXlsx(report: ServiceCallReport): Uint8Array {
+export function reportXlsx(
+  report: ServiceCallReport,
+  receipts?: ReceiptsReport,
+): Uint8Array {
   return buildXlsx([
     { name: "By engineer", rows: summaryRows(report), columns: SUMMARY_COLUMNS },
     { name: "By property", rows: propertyRows(report), columns: PROPERTY_COLUMNS },
     { name: "Detail", rows: detailRows(report), columns: DETAIL_COLUMNS },
+    ...(receipts
+      ? [{ name: "Receipts", rows: receiptRows(receipts), columns: RECEIPT_COLUMNS }]
+      : []),
   ]);
+}
+
+const RECEIPT_COLUMNS = [
+  { width: 30 },
+  { width: 12 },
+  { width: 26 },
+  { width: 20 },
+  { width: 13 },
+  { width: 22 },
+  { width: 14 },
+  { width: 34 },
+];
+
+/** The period's credit card receipts, grouped by the property they are charged to. */
+function receiptRows(report: ReceiptsReport): Cell[][] {
+  const rows: Cell[][] = [];
+
+  rows.push([{ value: "Credit card receipts by property", style: "title" }]);
+  rows.push([{ value: `${usDate(report.from)} to ${usDate(report.to)}` }]);
+  rows.push([
+    { value: "A return is a negative amount, so it nets off the charge it reverses." },
+  ]);
+  rows.push([
+    { value: "Property / receipt", style: "bold" },
+    { value: "Date", style: "bold" },
+    { value: "Merchant", style: "bold" },
+    { value: "Category", style: "bold" },
+    { value: "Amount", style: "bold" },
+    { value: "Logged by", style: "bold" },
+    { value: "Receipt file", style: "bold" },
+    { value: "Notes", style: "bold" },
+  ]);
+
+  for (const property of report.properties) {
+    rows.push([
+      { value: property.propertyName, style: "bold" },
+      { value: "" },
+      { value: "" },
+      { value: "" },
+      { value: property.amount, style: "boldMoney" },
+      { value: "" },
+      { value: `${property.count} receipt${property.count === 1 ? "" : "s"}` },
+      { value: "" },
+    ]);
+
+    for (const receipt of property.receipts) {
+      rows.push([
+        { value: "" },
+        { value: usDate(receipt.date) },
+        { value: receipt.merchant ?? "" },
+        { value: receipt.category ?? "" },
+        { value: receipt.amount, style: "money" },
+        { value: receipt.loggedBy },
+        { value: receipt.receiptPath === null ? "none attached" : "attached" },
+        { value: receipt.notes ?? "" },
+      ]);
+    }
+
+    rows.push([]);
+  }
+
+  rows.push([
+    { value: "All properties", style: "bold" },
+    { value: "" },
+    { value: "" },
+    { value: "" },
+    { value: report.amount, style: "boldMoney" },
+    { value: "" },
+    { value: `${report.count} receipt${report.count === 1 ? "" : "s"}`, style: "bold" },
+    { value: "" },
+  ]);
+
+  if (report.missingFileCount > 0) {
+    rows.push([]);
+    rows.push([
+      {
+        value: `${report.missingFileCount} receipt${
+          report.missingFileCount === 1 ? " has" : "s have"
+        } no image or PDF attached.`,
+      },
+    ]);
+  }
+
+  return rows;
 }
 
 const PROPERTY_COLUMNS = [{ width: 38 }, { width: 13 }, { width: 13 }, { width: 11 }];

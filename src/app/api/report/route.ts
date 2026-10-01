@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { buildReport } from "@/lib/report";
+import { buildReceiptsReport } from "@/lib/receipts-report";
 import { reportXlsx } from "@/lib/report-xlsx";
 
 export async function GET(request: Request) {
@@ -13,9 +14,12 @@ export async function GET(request: Request) {
     return new Response("Pick a valid date range.", { status: 400 });
   }
 
-  const report = await buildReport(from, to);
+  const [report, receipts] = await Promise.all([
+    buildReport(from, to),
+    buildReceiptsReport(from, to),
+  ]);
 
-  return new Response(reportXlsx(report) as BodyInit, {
+  return new Response(reportXlsx(report, receipts) as BodyInit, {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

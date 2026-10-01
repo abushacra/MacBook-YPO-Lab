@@ -288,6 +288,45 @@ A call covering two properties is counted **once, under the first**, the same
 choice the pay run makes — so the property subtotals always add up to the
 engineer's total. The count of such calls is shown at the foot.
 
+## Receipts report and the QuickBooks expense upload
+
+**Admin → Report → Receipts** lists the period's credit card receipts grouped by
+the property they were charged to, each with its merchant, category, who logged
+it and whether a file is attached. A return is a negative amount, so it nets off
+inside its property's total. Receipts with no image or PDF are counted, since
+there is nothing to send an accountant for those.
+
+**Download for QuickBooks** gives a **ZIP**, not a bare CSV:
+
+| In the ZIP | What it is |
+| --- | --- |
+| `expenses.csv` | the expense import, matching Intuit's `sample_expenses_import` template — the same eighteen headers, UTF-8 BOM, CRLF, MM/DD/YYYY |
+| `receipts/KAPA-EXP-…` | each receipt image or PDF, named with the Ref No. on its row |
+| `receipts-manifest.csv` | ref, property, date, amount and file name, tying the two together |
+
+**QuickBooks' expense import has no column for an attachment**, so the files
+cannot ride in the CSV. Naming each one after its Ref No. is what makes attaching
+them afterwards a matter of matching names rather than hunting through a date
+range. A receipt whose file has gone missing from storage is skipped rather than
+failing the download, and the manifest says so.
+
+Each receipt is one expense with one `Category Details` line, carrying the
+property in `Customer/Project` with `Billable` set. A return exports as a
+negative amount, which is how QuickBooks records a credit back to the card. The
+names live in `src/lib/quickbooks.ts` beside the bill ones:
+
+| | |
+| --- | --- |
+| Payment account | `KPC Chase (autopay)` |
+| Payment method | `Credit Card` |
+| Category | `Reimbursable Expenses` |
+| Location | `Limited - Kapa Capital` |
+| Payee, when the receipt has none | `Credit Card Purchase` |
+
+`*Payee` is a required column, so a receipt with no merchant would fail the
+import. It falls back rather than being dropped, which keeps the charge and puts
+the gap in one obvious place in QuickBooks.
+
 ## Pay run — bills for QuickBooks Online
 
 **Admin → Pay run** turns logged work into vendor bills. Pick a date range and
