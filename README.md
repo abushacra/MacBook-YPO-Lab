@@ -23,6 +23,7 @@ cp .env.example .env.local
 | `SUPABASE_SECRET_KEY` | **You need to paste this.** Supabase Dashboard → Project Settings → API Keys → the `service_role` / secret key. |
 | `APP_SESSION_SECRET` | Any long random string. Generate one with `openssl rand -base64 32`. |
 | `NEXT_PUBLIC_APP_TIME_ZONE` | Optional. Sets what "today" means on the date fields. Defaults to `America/New_York`. |
+| `ANTHROPIC_API_KEY` | Optional. Lets the app read a photographed receipt and fill the receipt form in. console.anthropic.com → API Keys. Without it the form hides that flow. |
 
 `SUPABASE_SECRET_KEY` is server-only. It must never be prefixed with
 `NEXT_PUBLIC_` or referenced from a Client Component — it bypasses every
@@ -93,6 +94,37 @@ from storage before the row, so a failed delete cannot leave an orphaned file;
 a failure clearing storage is swallowed, because an orphaned file is better than
 a receipt that will not delete. A linked service call is untouched — the work
 happened whatever became of the receipt.
+
+### Reading a receipt automatically
+
+The receipt is the first field on the form, because picking it fills the rest in.
+The photo already uploads the moment it is chosen, so the app sends the stored
+image to Claude and pre-fills **amount**, **date**, **store or vendor**,
+**category** and **notes** from what it reads. A refund flips **Charge or
+return** to Return on its own.
+
+Three rules keep it honest:
+
+- **Nothing is saved automatically.** The fields fill in; the chief still checks
+  them and presses Save. OCR on a crumpled gas-station receipt is good, not
+  perfect, and a wrong amount here would reach a QuickBooks expense import.
+- **A scan never overwrites a person.** Only a field left alone gets filled —
+  anything already typed wins, so a slow upload finishing late cannot clobber it.
+  The date and the Charge/Return choice start with a value, so they are tracked
+  by whether they were touched rather than by being empty.
+- **The property is never guessed.** A receipt does not say which building the
+  work was for, so it stays a manual choice.
+
+A value that comes back implausible is dropped rather than filled in: a date
+outside 2020..next year or not a real calendar date, a zero or absurd amount, a
+category that is not one of the form's own. The banner under the receipt says
+what was filled, or says plainly that nothing was readable.
+
+The whole feature is optional. It needs `ANTHROPIC_API_KEY` in the environment
+(console.anthropic.com -> API Keys); without it the form hides the flow and
+behaves exactly as it did before, every field typed by hand. JPG, PNG, WebP and
+PDF can be read; HEIC cannot, though the uploader already converts camera photos
+to JPEG in the browser.
 
 ### Deleting a person
 

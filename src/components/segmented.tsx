@@ -18,11 +18,18 @@ export function Segmented({
   name,
   options,
   defaultValue,
+  value,
+  onChange,
 }: {
   name: string;
   options: SegmentedOption[];
   defaultValue?: string;
+  /** Pass with `onChange` to let the page set the choice, e.g. from a scanned receipt. */
+  value?: string;
+  onChange?: (value: string) => void;
 }) {
+  const controlled = value !== undefined;
+
   return (
     <div className={`grid gap-2 ${options.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
       {options.map((option) => (
@@ -31,7 +38,9 @@ export function Segmented({
             type="radio"
             name={name}
             value={option.value}
-            defaultChecked={defaultValue === option.value}
+            {...(controlled
+              ? { checked: value === option.value, onChange: () => onChange?.(option.value) }
+              : { defaultChecked: defaultValue === option.value })}
             className="peer sr-only"
           />
           <span

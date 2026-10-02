@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { canLogReceipts, requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { formatDate, formatLocation, todayISO } from "@/lib/format";
+import { scanningAvailable } from "@/lib/receipt-scan";
 import { ExpenseForm, type RecentCall } from "@/components/expense-form";
 
 export const metadata = { title: "New receipt · Kapa Service Log" };
@@ -61,7 +62,12 @@ export default async function NewExpensePage() {
   return (
     <>
       <h1 className="mb-5 text-xl font-bold">Log a credit card receipt</h1>
-      <ExpenseForm properties={properties} recentCalls={recentCalls} serverToday={todayISO()} />
+      <ExpenseForm
+        properties={properties}
+        recentCalls={recentCalls}
+        serverToday={todayISO()}
+        scanEnabled={scanningAvailable()}
+      />
     </>
   );
 }

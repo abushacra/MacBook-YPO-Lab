@@ -23,6 +23,10 @@ type Props = {
   maxFiles?: number;
   accept?: string;
   onBusyChange?: (busy: boolean) => void;
+  /** Called with the storage path each time a file finishes uploading. */
+  onUploaded?: (path: string) => void;
+  /** Called when a file is taken back off the form. */
+  onRemoved?: () => void;
 };
 
 const MAX_DIMENSION = 1600;
@@ -88,6 +92,8 @@ export function MediaUploader({
   maxFiles = 8,
   accept = "image/*,application/pdf",
   onBusyChange,
+  onUploaded,
+  onRemoved,
 }: Props) {
   const inputId = useId();
   const [items, setItems] = useState<Item[]>([]);
@@ -113,6 +119,8 @@ export function MediaUploader({
         const response = await fetch("/api/uploads", { method: "POST", body });
         const payload = (await response.json()) as { path?: string; error?: string };
 
+        if (response.ok && payload.path) onUploaded?.(payload.path);
+
         setItems((current) =>
           current.map((item) =>
             item.key !== key
@@ -132,7 +140,7 @@ export function MediaUploader({
         );
       }
     },
-    [bucket],
+    [bucket, onUploaded],
   );
 
   async function handleFiles(fileList: FileList | null) {
@@ -173,6 +181,7 @@ export function MediaUploader({
 
   function remove(key: string) {
     setItems((current) => current.filter((item) => item.key !== key));
+    onRemoved?.();
   }
 
   const atCapacity = items.length >= (multiple ? maxFiles : 1);
