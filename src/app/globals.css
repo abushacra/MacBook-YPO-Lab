@@ -169,4 +169,10 @@ input[type="number"]::-webkit-inner-spin-button {
   .report-page + .report-page {
     break-before: page;
   }
+
+  /* Starts a page where there is no previous sibling to key off, such as the
+     detail section that follows the engineer summaries. */
+  .report-break-before {
+    break-before: page;
+  }
 }

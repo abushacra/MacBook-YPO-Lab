@@ -222,7 +222,7 @@ function propertyRows(report: ServiceCallReport, showAmounts: boolean): Cell[][]
   rows.push([
     {
       value:
-        "Service calls counts every tier in one figure: a x 1.5 call counts as 1.5 and a x 2 as 2.",
+        "Service calls counts every tier in one figure: a x 1.5 call counts as 1.5 and a x 2 as 2. A call that covered two properties counts half at each, so these are this property's own share.",
     },
   ]);
   rows.push([
@@ -341,7 +341,7 @@ function summaryRows(report: ServiceCallReport, showAmounts: boolean): Cell[][] 
           report.secondPropertyCount === 1 ? "" : "s"
         } also covered a second property, and ${
           report.secondPropertyCount === 1 ? "is" : "are"
-        } counted once, under the first. The second property is named on each call in the Detail sheet, and nowhere on the by-property sheets.`,
+        } split half to each, so the property rows above are halves. The Detail sheet marks each one; which two properties they were is on the by-property sheets.`,
       },
     ]);
   }
@@ -349,11 +349,11 @@ function summaryRows(report: ServiceCallReport, showAmounts: boolean): Cell[][] 
   return rows;
 }
 
-const detailColumns = (showAmounts: boolean, showSecondProperty = true) => [
+const detailColumns = (showAmounts: boolean, showSplit = true) => [
   { width: 22 },
   { width: 12 },
   { width: 30 },
-  ...(showSecondProperty ? [{ width: 30 }] : []),
+  ...(showSplit ? [{ width: 8 }] : []),
   { width: 13 },
   { width: 18 },
   { width: 12 },
@@ -363,12 +363,15 @@ const detailColumns = (showAmounts: boolean, showSecondProperty = true) => [
   { width: 52 },
 ];
 
-function detailHeadingRow(showAmounts: boolean, showSecondProperty = true): Cell[] {
+function detailHeadingRow(showAmounts: boolean, showSplit = true): Cell[] {
   return [
     "Engineer",
     "Date",
     "Property",
-    ...(showSecondProperty ? ["Second property"] : []),
+    // Not the other property's name — a sheet that says a call was split
+    // explains the halves without putting one customer's address on another's
+    // page. The by-property sheets are where each half is actually shown.
+    ...(showSplit ? ["Split"] : []),
     "Service calls",
     "Service Call Charge",
     "Call type",
@@ -384,13 +387,13 @@ function detailRow(
   engineerName: string,
   call: ReportCallRow,
   showAmounts: boolean,
-  showSecondProperty = true,
+  showSplit = true,
 ): Cell[] {
   return [
     { value: engineerName },
     { value: usDate(call.date) },
     { value: call.property },
-    ...(showSecondProperty ? [{ value: call.secondProperty ?? "" }] : []),
+    ...(showSplit ? [{ value: call.isSplit ? "Half" : "" }] : []),
     // What this call counts as, beside the charge that sets it, so the column
     // can simply be added up.
     { value: call.weight },
@@ -411,13 +414,13 @@ function detailTotal(
   callCount: number,
   amount: number,
   showAmounts: boolean,
-  showSecondProperty = true,
+  showSplit = true,
 ): Cell[] {
   return [
     { value: label, style: "bold" },
     { value: "" },
     { value: "" },
-    ...(showSecondProperty ? [{ value: "" }] : []),
+    ...(showSplit ? [{ value: "" }] : []),
     { value: callCount, style: "bold" },
     { value: "service calls" },
     { value: "" },
@@ -443,7 +446,7 @@ function scopeLine(report: ServiceCallReport): string {
       : report.filters.paid === "paid"
         ? "Paid service calls only"
         : "Paid and unpaid service calls";
-  return `${paid}. A x 1.5 call counts as 1.5 service calls and a x 2 as 2.`;
+  return `${paid}. A x 1.5 call counts as 1.5 service calls and a x 2 as 2, and a call covering two properties counts half at each.`;
 }
 
 function tabNote(total: number, noun: string): Cell[][] {
@@ -487,8 +490,8 @@ function onePropertyRows(
 ): Cell[][] {
   const rows: Cell[][] = rangeHeader(report, property.propertyName);
   rows.push([]);
-  // No Second property column here: this tab is the one handed to the property
-  // it names, and the other building on a split call is somebody else's address.
+  // No Split column here: every figure on this tab is already this property's
+  // own half, so the word would raise a question the page must not answer.
   rows.push(detailHeadingRow(showAmounts, false));
 
   for (const call of property.calls) {

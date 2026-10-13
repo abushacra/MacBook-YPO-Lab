@@ -335,6 +335,37 @@ A call covering two properties is counted **once, under the first**, the same
 choice the pay run makes — so the property subtotals always add up to the
 engineer's total. The count of such calls is shown at the foot.
 
+## A call that covered two properties
+
+It counts **half at each**, for reporting and for billing alike. One rule, in
+`splitCall`, shared by the report and the pay run, so a property's figure on a
+report and its line on a bill can never disagree.
+
+Half is what keeps every total honest. Two halves are one call and two
+half-amounts are the amount, so the service call total, the engineer's total
+and the bill total are all exactly what they were before the split existed —
+only their distribution across properties changed. Counting the call at both
+properties instead would inflate the totals, which is what made an earlier
+attempt at this read as overstated.
+
+**The money is halved in cents, not dollars**, with the odd one going to the
+first property. Splitting $175.01 in dollars and rounding each half gives
+$87.51 twice, which invents a penny; in cents it gives $87.51 and $87.50, which
+adds back exactly. On a bill that penny is somebody's pay.
+
+Three things follow:
+
+- **Nobody is paid differently.** The two halves add back to what the call was
+  priced at, so an engineer's bill total is unchanged. Only which property's
+  customer is charged for what has changed.
+- **`Quantity x Rate = Amount` still holds** on every bill line. Weights halve
+  to clean quarter steps (0.5, 0.75, 1), so the quantity stays exact.
+- **The by-engineer day list still shows each call once**, with its whole
+  weight. A person went to that call once; it is the property pages that show
+  halves. A halved row carries a quiet "Half of a shared call" so the 0.5 is
+  not read as an error, and the Detail sheet marks it `Half` — neither names
+  the other building.
+
 ## Who can run a report
 
 Reports are open to **admins and chief engineers**, and they are not the same
@@ -356,6 +387,20 @@ unpaid work needs. `canSeeReportAmounts` is the one place that decides this.
 The boundary lives in `reportFiltersFor`, which both the screen and the Excel
 download call, because a download is a plain URL anyone can edit.
 
+## How the by-engineer report is laid out
+
+Every engineer's property totals first, all of them in sequence, then
+everybody's call detail after. The summaries are what gets read at a glance and
+compared across people; behind each engineer's call list, reaching the next
+one meant scrolling pages.
+
+With **One page per engineer** the detail section starts on a fresh page and
+each engineer's calls start another, so the summary block stays whole at the
+front.
+
+The spreadsheet already worked this way: **By engineer** is the summaries,
+**Detail** is every call, and the per-engineer tabs are one person each.
+
 ## Screening a report
 
 Four controls, and they compose rather than resetting one another:
@@ -367,11 +412,11 @@ Four controls, and they compose rather than resetting one another:
 | **Engineer or vendor** | One person, or everyone the reader may see. |
 | **Property** | One property, or all of them. |
 
-A property screen matches the property a call is **counted under** — its first.
-A call that named the screened property second is counted under its own first
-property everywhere in this report, so letting it in would put a group on the
-page for a building nobody asked for. Those calls are reported in a footnote
-instead of being silently dropped.
+A property screen matches **either** property a call named, because a call that
+covered two counts half at each — the screened property really is one of its
+properties. Only that property's half is shown, and the person's total narrows
+to match: a report of one building shows what that building owes, not what the
+engineer earned everywhere.
 
 ### A by-property page never names another property
 

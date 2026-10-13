@@ -54,6 +54,11 @@ export function ReportCallList({
                 <CallTypeBadge value={call.callType} />
                 <HoursBadge value={call.hoursType} />
                 {call.followUpNeeded && <FollowUpBadge />}
+                {/* Says why the count reads as a half, without naming where
+                    the other half went — that is the other property's page. */}
+                {call.isSplit && (
+                  <span className="chip bg-zinc-100 text-zinc-700">Half of a shared call</span>
+                )}
                 {call.approvalStatus !== "approved" && (
                   <ApprovalBadge value={call.approvalStatus} />
                 )}

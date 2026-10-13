@@ -503,61 +503,87 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                   ))}
                 </ul>
               ) : (
-                <ul className="space-y-3">
-                  {report.people.map((person) => (
-                    <li key={person.technicianId} className={pageClass}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-bold">{person.name}</p>
-                          <p className="text-xs text-muted">
+                /*
+                 * Every engineer's property totals first, then everybody's
+                 * call detail. The summaries are the part read at a glance and
+                 * compared across people, and burying each one behind the
+                 * previous engineer's call list meant scrolling pages to reach
+                 * the next.
+                 */
+                <>
+                  <section className="space-y-3">
+                    <h2 className="section-heading">Totals by engineer and property</h2>
+                    {report.people.map((person) => (
+                      <div key={person.technicianId} className="card p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-bold">{person.name}</p>
+                            <p className="text-xs text-muted">
+                              {formatCalls(person.callCount)} service call
+                              {person.callCount === 1 ? "" : "s"}
+                              {person.pendingCount > 0 &&
+                                ` · ${person.pendingCount} awaiting approval`}
+                              {showAmounts &&
+                                person.unpricedCount > 0 &&
+                                ` · ${person.unpricedCount} with no amount`}
+                            </p>
+                          </div>
+                          {showAmounts && (
+                            <p className="shrink-0 text-lg font-bold">
+                              {formatMoney(person.amount)}
+                            </p>
+                          )}
+                        </div>
+
+                        <ul className="mt-3 divide-y divide-hairline border-t border-hairline">
+                          {person.properties.map((property) => (
+                            <li
+                              key={property.propertyId}
+                              className="flex items-center justify-between gap-3 py-2"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold">
+                                  {property.propertyName}
+                                </span>
+                                <span className="block text-xs text-muted">
+                                  {formatCalls(property.callCount)} service call
+                                  {property.callCount === 1 ? "" : "s"}
+                                </span>
+                              </span>
+                              {showAmounts && (
+                                <span className="shrink-0 text-sm font-bold">
+                                  {formatMoney(property.amount)}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </section>
+
+                  <section
+                    className={`space-y-3 ${pages === "each" ? "report-break-before" : ""}`}
+                  >
+                    <h2 className="section-heading">Every call, by date</h2>
+                    {report.people.map((person) => (
+                      <div key={person.technicianId} className={pageClass}>
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 truncate font-bold">{person.name}</p>
+                          <p className="shrink-0 text-xs text-muted">
                             {formatCalls(person.callCount)} service call
                             {person.callCount === 1 ? "" : "s"}
-                            {person.pendingCount > 0 &&
-                              ` · ${person.pendingCount} awaiting approval`}
-                            {showAmounts &&
-                              person.unpricedCount > 0 &&
-                              ` · ${person.unpricedCount} with no amount`}
                           </p>
                         </div>
-                        {showAmounts && (
-                          <p className="shrink-0 text-lg font-bold">
-                            {formatMoney(person.amount)}
-                          </p>
-                        )}
+                        <ReportCallList
+                          calls={person.calls}
+                          heading="By date"
+                          showAmounts={showAmounts}
+                        />
                       </div>
-
-                      <ul className="mt-3 divide-y divide-hairline border-t border-hairline">
-                        {person.properties.map((property) => (
-                          <li
-                            key={property.propertyId}
-                            className="flex items-center justify-between gap-3 py-2"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold">
-                                {property.propertyName}
-                              </span>
-                              <span className="block text-xs text-muted">
-                                {formatCalls(property.callCount)} service call
-                                {property.callCount === 1 ? "" : "s"}
-                              </span>
-                            </span>
-                            {showAmounts && (
-                              <span className="shrink-0 text-sm font-bold">
-                                {formatMoney(property.amount)}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-
-                      <ReportCallList
-                        calls={person.calls}
-                        heading="Every call, by date"
-                        showAmounts={showAmounts}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                    ))}
+                  </section>
+                </>
               )}
 
               <div className="card flex items-center justify-between px-4 py-3">
@@ -576,29 +602,18 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
               </div>
 
               {/*
-                * Both notes are about calls that touched a second building, so
-                * neither belongs on a by-property page: that page gets handed
-                * to the property it names, and the other building is somebody
-                * else's address. The by-engineer page is internal, so the
-                * counting note stays there, where it explains why a person's
-                * property subtotals add up to their total.
+                * The by-property page gets handed to the property it names, so
+                * it says nothing about calls that also covered somewhere else.
+                * The by-engineer page is internal, and there the note explains
+                * why a person's property subtotals are halves.
                 */}
-              {view !== "property" && report.secondPropertyOnlyCount > 0 && (
-                <p className="px-1 text-xs text-muted">
-                  {report.secondPropertyOnlyCount} further call
-                  {report.secondPropertyOnlyCount === 1 ? "" : "s"} named{" "}
-                  {screenedProperty?.name ?? "this property"} as a second property. Those are
-                  counted under their first property, so they are left out here rather than
-                  shown under a building nobody asked for.
-                </p>
-              )}
-
               {view !== "property" && report.secondPropertyCount > 0 && (
                 <p className="px-1 text-xs text-muted">
                   {report.secondPropertyCount} call
-                  {report.secondPropertyCount === 1 ? "" : "s"} also covered a second property,
-                  and {report.secondPropertyCount === 1 ? "is" : "are"} counted once here, under
-                  the first — so the property subtotals always add up to the engineer&apos;s total.
+                  {report.secondPropertyCount === 1 ? "" : "s"} covered two properties and{" "}
+                  {report.secondPropertyCount === 1 ? "is" : "are"} split half to each — so the
+                  property subtotals still add up to the engineer&apos;s total, and each
+                  property is billed for its own half.
                 </p>
               )}
             </>

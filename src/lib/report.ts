@@ -4,6 +4,7 @@ import { db } from "@/lib/supabase";
 import { asHoursType, type HoursType } from "@/lib/constants";
 import { formatLocation } from "@/lib/format";
 import { HOURS_TYPE_MULTIPLIERS } from "@/lib/rates";
+import { splitCall, type CallShare } from "@/lib/split";
 
 /**
  * The service call report: every call in a date range, totalled by the person
@@ -34,12 +35,18 @@ export type ReportPropertyRow = {
 /** One service call, as it appears in the detail list under its engineer. */
 export type ReportCallRow = {
   date: string;
-  /** The property this call is counted under — its first one. */
-  propertyId: string;
+  /** The first property in play, with its space. */
   property: string;
-  secondProperty: string | null;
+  /**
+   * How this call divides between the properties it covered — one share, or
+   * two halves. The by-property view takes its own share from here rather than
+   * walking the calls again, so the two views cannot answer differently.
+   */
+  shares: CallShare[];
+  /** Whether this call was divided between two properties. */
+  isSplit: boolean;
   hoursType: HoursType;
-  /** What this one call counts as: 1, 1.5 or 2, by its Service Call Charge. */
+  /** What this call counts as here: 1, 1.5 or 2, or half that on a split. */
   weight: number;
   callType: string;
   approvalStatus: string;
@@ -56,7 +63,7 @@ export type ReportPersonRow = {
   amount: number;
   unpricedCount: number;
   pendingCount: number;
-  /** Calls that also covered a second property, counted here on the first only. */
+  /** Calls that covered two properties, split half to each. Counted once. */
   secondPropertyCount: number;
   properties: ReportPropertyRow[];
   /** Every call this person logged in the range, oldest first. */
@@ -125,13 +132,6 @@ export type ServiceCallReport = {
   from: string;
   to: string;
   filters: ReportFilters;
-  /**
-   * Calls left out of a property screen because that property was their
-   * second, not their first. They are counted under their first property
-   * everywhere in this report, so including them here would show a group for
-   * a property nobody asked for.
-   */
-  secondPropertyOnlyCount: number;
   people: ReportPersonRow[];
   /** The same work grouped the other way: property first, engineers under it. */
   properties: ReportPropertyGroup[];
@@ -210,17 +210,17 @@ export function groupReport(
   const people = new Map<string, ReportPersonRow & { byProperty: Map<string, ReportPropertyRow> }>();
 
   /*
-   * The property screen is applied here rather than in the query so these can
-   * be counted: a call that named the screened property second is counted
-   * under its first property everywhere in this report, so letting it in would
-   * put a group on the page for a property nobody screened for. It is reported
-   * as a footnote instead of being silently dropped.
+   * A property screen matches either property a call named, because a call
+   * that covered two now counts half at each — the screened property really is
+   * one of its properties, not a footnote. Only that property's half is kept,
+   * which the share filter below takes care of.
    */
-  let secondPropertyOnlyCount = 0;
-
   for (const call of calls) {
-    if (filters.propertyId !== null && call.property_id !== filters.propertyId) {
-      if (call.property_id_2 === filters.propertyId) secondPropertyOnlyCount += 1;
+    if (
+      filters.propertyId !== null &&
+      call.property_id !== filters.propertyId &&
+      call.property_id_2 !== filters.propertyId
+    ) {
       continue;
     }
 
@@ -243,27 +243,6 @@ export function groupReport(
       people.set(call.technician_id, person);
     }
 
-    /*
-     * A call covering two properties is counted once, on the first — the same
-     * choice the pay run makes. Splitting it would need a rule for how to divide
-     * one call between two buildings, and there isn't one. Counting it twice
-     * would stop the property subtotals adding up to the person's total, which
-     * is the whole point of the report.
-     */
-    let row = person.byProperty.get(call.property_id);
-    if (row === undefined) {
-      row = {
-        propertyId: call.property_id,
-        // The live name, falling back to the label stored on the call if the
-        // property has since been deleted.
-        propertyName: propertyNameById.get(call.property_id) ?? call.property_label,
-        callCount: 0,
-        amount: 0,
-        unpricedCount: 0,
-      };
-      person.byProperty.set(call.property_id, row);
-    }
-
     const amount = call.billed_amount ?? 0;
 
     /*
@@ -275,33 +254,69 @@ export function groupReport(
      */
     const weight = HOURS_TYPE_MULTIPLIERS[asHoursType(call.hours_type)];
 
-    row.callCount = Math.round((row.callCount + weight) * 100) / 100;
-    row.amount = Math.round((row.amount + amount) * 100) / 100;
-    if (call.billed_amount === null) row.unpricedCount += 1;
+    /*
+     * A call covering two properties is divided half and half between them, by
+     * the same rule the pay run uses, so a property's figure here and its line
+     * on a bill always agree. Two halves are one call, so a person's property
+     * subtotals still add up to their total.
+     *
+     * On a screened report only the screened property's half is in play, and
+     * the person's total narrows to match — a report of one building shows
+     * what that building owes, not what the engineer earned everywhere.
+     */
+    const shares = splitCall(call, weight, amount).filter(
+      (share) => filters.propertyId === null || share.propertyId === filters.propertyId,
+    );
 
-    person.callCount = Math.round((person.callCount + weight) * 100) / 100;
-    person.amount = Math.round((person.amount + amount) * 100) / 100;
+    for (const share of shares) {
+      let row = person.byProperty.get(share.propertyId);
+      if (row === undefined) {
+        row = {
+          propertyId: share.propertyId,
+          // The live name, falling back to the label stored on the call if the
+          // property has since been deleted.
+          propertyName: propertyNameById.get(share.propertyId) ?? share.propertyLabel,
+          callCount: 0,
+          amount: 0,
+          unpricedCount: 0,
+        };
+        person.byProperty.set(share.propertyId, row);
+      }
+
+      row.callCount = Math.round((row.callCount + share.weight) * 100) / 100;
+      row.amount = Math.round((row.amount + share.amount) * 100) / 100;
+      // A call with no amount is a whole call to chase at each property it
+      // touched, not half a problem.
+      if (call.billed_amount === null) row.unpricedCount += 1;
+    }
+
+    const shownWeight = shares.reduce((total, share) => total + share.weight, 0);
+    const shownAmount = shares.reduce((total, share) => total + share.amount, 0);
+
+    person.callCount = Math.round((person.callCount + shownWeight) * 100) / 100;
+    person.amount = Math.round((person.amount + shownAmount) * 100) / 100;
     if (call.billed_amount === null) person.unpricedCount += 1;
     if (call.approval_status === "pending") person.pendingCount += 1;
-    if (call.property_id_2 !== null) person.secondPropertyCount += 1;
+    if (shares.some((share) => share.isSplit)) person.secondPropertyCount += 1;
 
-    // The detail list: the call itself, for the day-by-day view under the
-    // summary. Labels are resolved here so the screen and the spreadsheet read
-    // the same thing.
+    /*
+     * One row per call, not per share — the by-engineer day list is a list of
+     * what the person did, and a call they went to once should appear once.
+     * The shares ride along so the by-property view can take just its own half
+     * without walking the calls a second time and risking a different answer.
+     */
     person.calls.push({
       date: call.call_date,
-      propertyId: call.property_id,
-      property: formatLocation(call.property_label, call.space_label),
-      secondProperty: call.property_label_2
-        ? formatLocation(call.property_label_2, call.space_label_2)
-        : null,
+      property: formatLocation(shares[0]?.propertyLabel ?? call.property_label, shares[0]?.spaceLabel ?? call.space_label),
+      shares,
+      isSplit: shares.some((share) => share.isSplit),
       hoursType: asHoursType(call.hours_type),
-      weight,
+      weight: shownWeight,
       callType: call.call_type,
       approvalStatus: call.approval_status,
       followUpNeeded: call.follow_up_needed,
       description: call.description,
-      amount: call.billed_amount,
+      amount: call.billed_amount === null ? null : shownAmount,
     });
   }
 
@@ -323,7 +338,6 @@ export function groupReport(
     from,
     to,
     filters,
-    secondPropertyOnlyCount,
     people: rows,
     properties: byProperty(rows),
     callCount: Math.round(sum((person) => person.callCount) * 100) / 100,
@@ -360,10 +374,23 @@ function byProperty(people: ReportPersonRow[]): ReportPropertyGroup[] {
         groups.set(row.propertyId, group);
       }
 
+      /*
+       * A call lands in this group carrying only this property's share: its
+       * half of the count and its half of the money on a split, the whole of
+       * both otherwise. The other property is not named here, because this
+       * page goes to the one that is.
+       */
       for (const call of person.calls) {
-        if (call.propertyId === row.propertyId) {
-          group.calls.push({ ...call, engineerName: person.name });
-        }
+        const share = call.shares.find((candidate) => candidate.propertyId === row.propertyId);
+        if (share === undefined) continue;
+
+        group.calls.push({
+          ...call,
+          property: formatLocation(share.propertyLabel, share.spaceLabel),
+          weight: share.weight,
+          amount: call.amount === null ? null : share.amount,
+          engineerName: person.name,
+        });
       }
 
       group.callCount = Math.round((group.callCount + row.callCount) * 100) / 100;

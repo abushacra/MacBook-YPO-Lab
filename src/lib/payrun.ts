@@ -4,11 +4,17 @@ import { db } from "@/lib/supabase";
 import { asHoursType } from "@/lib/constants";
 import { HOURS_TYPE_MULTIPLIERS, baseRate } from "@/lib/rates";
 import { billTarget } from "@/lib/quickbooks";
+import { splitCall } from "@/lib/split";
 
 /**
  * Builds a pay run: one vendor bill per person for the chosen dates, with one
  * line per property holding that property's shift total, so each line can be
  * charged to the property's customer for reimbursement.
+ *
+ * A call that covered two properties is divided half and half between them —
+ * see `splitCall`, which the report shares, so a property's figure on a report
+ * and its line on a bill always agree. The person is still paid the whole
+ * amount: the two halves add back to it exactly, odd cent included.
  *
  * An in-house engineer's lines are product lines; an outside vendor's are
  * expense-category lines. That is the only difference, and it changes how
@@ -67,7 +73,7 @@ export type PayRunVendor = {
   lines: PayRunLine[];
   total: number;
   shiftCount: number;
-  /** Shifts covering two properties: their whole amount sits on the first. */
+  /** Calls covering two properties, divided half to each. Counted once here. */
   splitShiftCount: number;
 };
 
@@ -89,6 +95,7 @@ export type PayRunShift = {
   property_id: string;
   property_label: string;
   property_id_2: string | null;
+  property_label_2?: string | null;
   hours_type: string;
   billed_amount: number | null;
   approval_status: string;
@@ -100,7 +107,7 @@ export async function buildPayRun(from: string, to: string): Promise<PayRun> {
     db()
       .from("service_calls")
       .select(
-        "id, technician_id, call_date, property_id, property_label, property_id_2, hours_type, billed_amount, approval_status, billed_at",
+        "id, technician_id, call_date, property_id, property_label, property_id_2, property_label_2, hours_type, billed_amount, approval_status, billed_at",
       )
       .gte("call_date", from)
       .lte("call_date", to),
@@ -179,31 +186,42 @@ export function groupPayRun(
      *
      * Keyed on the property id so renaming a property keeps its shifts together.
      */
-    const key =
-      billAs === "category"
-        ? shift.property_id
-        : `${shift.property_id}|${rate.toFixed(2)}`;
+    /*
+     * A call covering two properties becomes two shares of half each, so each
+     * property's customer is billed for its own half rather than one of them
+     * carrying the whole call. The halves add back to exactly what the call was
+     * priced at, so the person is still paid in full.
+     */
+    const shares = splitCall(shift, weight, shift.billed_amount);
 
-    let entry = byProperty.get(key);
-    if (entry === undefined) {
-      const base = {
-        propertyId: shift.property_id,
-        // The live name is what must match the QuickBooks customer; the stored
-        // label is the fallback if the property was renamed out from under us.
-        customerName: propertyNameById.get(shift.property_id) ?? shift.property_label,
-        shiftCount: 0,
-        amount: 0,
-      };
-      entry = {
-        line: billAs === "item" ? { ...base, billAs, rate } : { ...base, billAs },
-        splitShifts: 0,
-      };
-      byProperty.set(key, entry);
+    for (const [index, share] of shares.entries()) {
+      const key =
+        billAs === "category"
+          ? share.propertyId
+          : `${share.propertyId}|${rate.toFixed(2)}`;
+
+      let entry = byProperty.get(key);
+      if (entry === undefined) {
+        const base = {
+          propertyId: share.propertyId,
+          // The live name is what must match the QuickBooks customer; the stored
+          // label is the fallback if the property was renamed out from under us.
+          customerName: propertyNameById.get(share.propertyId) ?? share.propertyLabel,
+          shiftCount: 0,
+          amount: 0,
+        };
+        entry = {
+          line: billAs === "item" ? { ...base, billAs, rate } : { ...base, billAs },
+          splitShifts: 0,
+        };
+        byProperty.set(key, entry);
+      }
+
+      entry.line.shiftCount = Math.round((entry.line.shiftCount + share.weight) * 100) / 100;
+      entry.line.amount = Math.round((entry.line.amount + share.amount) * 100) / 100;
+      // Counted on the first share only: one call was split, not two.
+      if (share.isSplit && index === 0) entry.splitShifts += 1;
     }
-
-    entry.line.shiftCount = Math.round((entry.line.shiftCount + weight) * 100) / 100;
-    entry.line.amount = Math.round((entry.line.amount + shift.billed_amount) * 100) / 100;
-    if (shift.property_id_2 !== null) entry.splitShifts += 1;
   }
 
   const vendors: PayRunVendor[] = [...grouped.entries()]
