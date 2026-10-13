@@ -60,15 +60,19 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
     : "unpaid";
   const propertyId = one(params.property);
   const justDeleted = one(params.deleted) === "1";
+  const page = Math.max(1, Math.trunc(Number(one(params.page))) || 1);
 
   let query = db()
     .from("service_calls")
     .select(
       "id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, description, follow_up_needed, technician_id, billed_amount, approval_status, routed_to_chief_id, billed_at",
+      // The count is what makes the pager honest: without it the page cannot
+      // tell "that is everything" from "there is more below the cut".
+      { count: "exact" },
     )
     .order("call_date", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(PAGE_SIZE);
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (paid === "unpaid") query = query.is("billed_at", null);
   if (paid === "paid") query = query.not("billed_at", "is", null);
@@ -88,7 +92,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   }
 
   // The roster is small, so a lookup table beats an embedded join here.
-  const [{ data: calls }, { data: properties }, { data: technicians }] = await Promise.all([
+  const [{ data: calls, count }, { data: properties }, { data: technicians }] = await Promise.all([
     query,
     db().from("properties").select("id, name").order("name"),
     db().from("technicians").select("id, name"),
@@ -129,17 +133,34 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
     ...(canReview ? [{ value: "to_approve", label: "To approve" }] : []),
   ];
 
-  /** Every filter keeps the others, so changing one never silently resets the rest. */
-  const hrefFor = (next: { scope?: string; paid?: string }) => {
+  /**
+   * Every filter keeps the others, so changing one never silently resets the
+   * rest. Changing a filter does reset the page, because page 3 of the old
+   * filter means nothing under the new one.
+   */
+  const hrefFor = (next: { scope?: string; paid?: string; page?: number }) => {
     const search = new URLSearchParams();
     const nextScope = next.scope ?? scope;
     const nextPaid = next.paid ?? paid;
+    const changedFilter = next.scope !== undefined || next.paid !== undefined;
+    const nextPage = changedFilter ? 1 : (next.page ?? page);
     if (nextScope !== "all") search.set("scope", nextScope);
     if (nextPaid !== "unpaid") search.set("paid", nextPaid);
     if (propertyId) search.set("property", propertyId);
+    if (nextPage > 1) search.set("page", String(nextPage));
     const query = search.toString();
     return query ? `/calls?${query}` : "/calls";
   };
+
+  /*
+   * Before this the list stopped dead at the first PAGE_SIZE rows, so a call
+   * older than the 50th simply could not be opened — it showed in the reports
+   * and nowhere else.
+   */
+  const total = count ?? 0;
+  const firstShown = (page - 1) * PAGE_SIZE + 1;
+  const lastShown = Math.min(page * PAGE_SIZE, total);
+  const hasOlder = page * PAGE_SIZE < total;
 
   return (
     <div className="space-y-4">
@@ -205,7 +226,9 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
 
       {user.is_admin && billableTotal > 0 && (
         <div className="card flex items-center justify-between px-4 py-3">
-          <span className="text-sm font-semibold text-muted">Billable total shown</span>
+          <span className="text-sm font-semibold text-muted">
+            Billable total{total > PAGE_SIZE ? " on this page" : ""}
+          </span>
           <span className="text-lg font-bold">{formatMoney(billableTotal)}</span>
         </div>
       )}
@@ -271,6 +294,13 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
           ))}
         </ul>
         </Bulk>
+      ) : page > 1 ? (
+        <p className="card px-4 py-8 text-center text-sm text-muted">
+          Nothing on this page.{" "}
+          <Link href={hrefFor({ page: 1 })} className="font-semibold text-brand-700 underline">
+            Back to the first page
+          </Link>
+        </p>
       ) : (
         <p className="card px-4 py-8 text-center text-sm text-muted">
           No service calls match this filter.
@@ -278,11 +308,43 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
         </p>
       )}
 
-      {calls && calls.length === PAGE_SIZE && (
-        <p className="px-1 text-center text-xs text-muted">
-          Showing the {PAGE_SIZE} most recent. Narrow the filters to see older service calls.
-        </p>
+      {total > PAGE_SIZE && (
+        <nav aria-label="Pages of service calls" className="flex items-center justify-between gap-2">
+          <PageLink href={hrefFor({ page: page - 1 })} enabled={page > 1}>
+            ← Newer
+          </PageLink>
+          <span className="text-xs font-semibold text-muted">
+            {firstShown}–{lastShown} of {total}
+          </span>
+          <PageLink href={hrefFor({ page: page + 1 })} enabled={hasOlder}>
+            Older →
+          </PageLink>
+        </nav>
       )}
     </div>
+  );
+}
+
+/** One step through the list, greyed out rather than hidden at either end. */
+function PageLink({
+  href,
+  enabled,
+  children,
+}: {
+  href: string;
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
+  if (!enabled) {
+    return (
+      <span aria-disabled="true" className="chip min-h-11 px-4 text-sm text-muted opacity-40">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link href={href} className="chip min-h-11 border border-hairline bg-white px-4 text-sm font-semibold text-ink">
+      {children}
+    </Link>
   );
 }

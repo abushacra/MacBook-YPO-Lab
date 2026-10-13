@@ -255,6 +255,21 @@ work has been paid is not a pay rate.
 Because the default changed, a screen that used to show everything now shows only
 what is outstanding. **Paid & unpaid** brings the rest back.
 
+## Paging through the list
+
+The Service Calls screen shows 50 at a time with **← Newer / Older →** and an
+`n–m of total` count, and the page resets whenever a filter changes.
+
+It used to stop dead at the first 50 rows. A call older than the 50th could not
+be opened, approved or deleted from the app at all — it still counted in the
+reports and in a pay run, which is how the gap showed up: a service call visible
+in a report and nowhere else. The count beside the pager is what makes that
+impossible to miss again; it comes back with the rows, so the screen can tell
+"that is everything" from "there is more below".
+
+The **Billable total** above the list only ever covered the rows on screen. It
+says "on this page" whenever there is more than one.
+
 ## Approving in bulk
 
 The **To approve** filter on the Service Calls screen puts a checkbox on every
