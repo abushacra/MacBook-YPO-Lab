@@ -11,6 +11,12 @@ import {
  * Every call in a block, by date. Shared by the by-engineer and by-property
  * views so a call reads identically whichever way the report is grouped — the
  * only difference is whose name is worth repeating.
+ *
+ * A call that covered two properties names only the one it is counted under.
+ * The other building is deliberately absent: on a by-property page it would be
+ * one customer's address on another customer's report, and on either page a
+ * bare "+ somewhere else" beside a call that counts once here reads as a
+ * second call rather than as a footnote about counting.
  */
 export function ReportCallList({
   calls,
@@ -40,15 +46,7 @@ export function ReportCallList({
                 {formatDate(call.date, { weekday: "short", year: undefined })} ·{" "}
                 {nameOf ? nameOf(call, index) : call.property}
               </span>
-              {nameOf ? (
-                <span className="block text-xs text-muted">{call.property}</span>
-              ) : (
-                call.secondProperty && (
-                  <span className="block text-sm font-semibold text-muted">
-                    + {call.secondProperty}
-                  </span>
-                )
-              )}
+              {nameOf && <span className="block text-xs text-muted">{call.property}</span>}
               {call.description && (
                 <span className="mt-0.5 block text-xs text-muted">{call.description}</span>
               )}

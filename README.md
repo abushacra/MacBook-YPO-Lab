@@ -373,6 +373,18 @@ property everywhere in this report, so letting it in would put a group on the
 page for a building nobody asked for. Those calls are reported in a footnote
 instead of being silently dropped.
 
+### A by-property page never names another property
+
+A by-property page gets handed to the property it names, so the other building
+on a split call is somebody else's address. Nothing on that page refers to it:
+no `+ second property` line under a call, no **Second property** column on the
+per-property tab, and no footnote about calls that also covered somewhere else.
+
+The by-engineer side is internal, so it keeps the counting note and the Detail
+sheet keeps the column. The `+ name` beside a call was dropped from both views
+regardless: a call that counts once reading as `14701 Flint Lee + 10908` looks
+like two calls rather than a note about where the work happened.
+
 ## One page, or one tab, each
 
 Both main views offer **One long report** or **One page per property / per

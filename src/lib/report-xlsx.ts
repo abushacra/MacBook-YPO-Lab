@@ -65,7 +65,7 @@ export function reportXlsx(
       ...properties.map((property) => ({
         name: property.propertyName,
         rows: onePropertyRows(report, property, showAmounts),
-        columns: detailColumns(showAmounts),
+        columns: detailColumns(showAmounts, false),
       })),
       ...people.map((person) => ({
         name: person.name,
@@ -261,18 +261,13 @@ function propertyRows(report: ServiceCallReport, showAmounts: boolean): Cell[][]
 
   rows.push(...tabNote(report.properties.length, "property"));
 
-  if (report.secondPropertyCount > 0) {
-    rows.push([]);
-    rows.push([
-      {
-        value: `${report.secondPropertyCount} call${
-          report.secondPropertyCount === 1 ? "" : "s"
-        } also covered a second property, and ${
-          report.secondPropertyCount === 1 ? "is" : "are"
-        } counted once here, under the first. The second property is named on each call in the Detail sheet.`,
-      },
-    ]);
-  }
+  /*
+   * No note about calls that also covered a second building. This sheet and
+   * the per-property tabs beside it are what a property's own customer sees,
+   * and the other building is somebody else's address. The By engineer sheet
+   * keeps the note, where it explains why a person's property subtotals add up
+   * to their total.
+   */
 
   return rows;
 }
@@ -346,7 +341,7 @@ function summaryRows(report: ServiceCallReport, showAmounts: boolean): Cell[][] 
           report.secondPropertyCount === 1 ? "" : "s"
         } also covered a second property, and ${
           report.secondPropertyCount === 1 ? "is" : "are"
-        } counted once, under the first. The second property is named on each call in the Detail sheet.`,
+        } counted once, under the first. The second property is named on each call in the Detail sheet, and nowhere on the by-property sheets.`,
       },
     ]);
   }
@@ -354,11 +349,11 @@ function summaryRows(report: ServiceCallReport, showAmounts: boolean): Cell[][] 
   return rows;
 }
 
-const detailColumns = (showAmounts: boolean) => [
+const detailColumns = (showAmounts: boolean, showSecondProperty = true) => [
   { width: 22 },
   { width: 12 },
   { width: 30 },
-  { width: 30 },
+  ...(showSecondProperty ? [{ width: 30 }] : []),
   { width: 13 },
   { width: 18 },
   { width: 12 },
@@ -368,22 +363,20 @@ const detailColumns = (showAmounts: boolean) => [
   { width: 52 },
 ];
 
-const DETAIL_HEADINGS = [
-  "Engineer",
-  "Date",
-  "Property",
-  "Second property",
-  "Service calls",
-  "Service Call Charge",
-  "Call type",
-  "Approval",
-  "Follow-up",
-];
-
-function detailHeadingRow(showAmounts: boolean): Cell[] {
-  return [...DETAIL_HEADINGS, ...(showAmounts ? ["Amount"] : []), "Work completed"].map(
-    (value) => ({ value, style: "bold" as const }),
-  );
+function detailHeadingRow(showAmounts: boolean, showSecondProperty = true): Cell[] {
+  return [
+    "Engineer",
+    "Date",
+    "Property",
+    ...(showSecondProperty ? ["Second property"] : []),
+    "Service calls",
+    "Service Call Charge",
+    "Call type",
+    "Approval",
+    "Follow-up",
+    ...(showAmounts ? ["Amount"] : []),
+    "Work completed",
+  ].map((value) => ({ value, style: "bold" as const }));
 }
 
 /** One call as a detail row. The engineer is named on every row so the table sorts. */
@@ -391,12 +384,13 @@ function detailRow(
   engineerName: string,
   call: ReportCallRow,
   showAmounts: boolean,
+  showSecondProperty = true,
 ): Cell[] {
   return [
     { value: engineerName },
     { value: usDate(call.date) },
     { value: call.property },
-    { value: call.secondProperty ?? "" },
+    ...(showSecondProperty ? [{ value: call.secondProperty ?? "" }] : []),
     // What this call counts as, beside the charge that sets it, so the column
     // can simply be added up.
     { value: call.weight },
@@ -417,12 +411,13 @@ function detailTotal(
   callCount: number,
   amount: number,
   showAmounts: boolean,
+  showSecondProperty = true,
 ): Cell[] {
   return [
     { value: label, style: "bold" },
     { value: "" },
     { value: "" },
-    { value: "" },
+    ...(showSecondProperty ? [{ value: "" }] : []),
     { value: callCount, style: "bold" },
     { value: "service calls" },
     { value: "" },
@@ -492,14 +487,18 @@ function onePropertyRows(
 ): Cell[][] {
   const rows: Cell[][] = rangeHeader(report, property.propertyName);
   rows.push([]);
-  rows.push(detailHeadingRow(showAmounts));
+  // No Second property column here: this tab is the one handed to the property
+  // it names, and the other building on a split call is somebody else's address.
+  rows.push(detailHeadingRow(showAmounts, false));
 
   for (const call of property.calls) {
-    rows.push(detailRow(call.engineerName, call, showAmounts));
+    rows.push(detailRow(call.engineerName, call, showAmounts, false));
   }
 
   rows.push([]);
-  rows.push(detailTotal(property.propertyName, property.callCount, property.amount, showAmounts));
+  rows.push(
+    detailTotal(property.propertyName, property.callCount, property.amount, showAmounts, false),
+  );
 
   if (property.unpricedCount > 0) {
     rows.push([]);

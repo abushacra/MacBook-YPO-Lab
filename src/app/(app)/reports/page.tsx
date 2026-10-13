@@ -575,7 +575,15 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                 )}
               </div>
 
-              {report.secondPropertyOnlyCount > 0 && (
+              {/*
+                * Both notes are about calls that touched a second building, so
+                * neither belongs on a by-property page: that page gets handed
+                * to the property it names, and the other building is somebody
+                * else's address. The by-engineer page is internal, so the
+                * counting note stays there, where it explains why a person's
+                * property subtotals add up to their total.
+                */}
+              {view !== "property" && report.secondPropertyOnlyCount > 0 && (
                 <p className="px-1 text-xs text-muted">
                   {report.secondPropertyOnlyCount} further call
                   {report.secondPropertyOnlyCount === 1 ? "" : "s"} named{" "}
@@ -585,7 +593,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                 </p>
               )}
 
-              {report.secondPropertyCount > 0 && (
+              {view !== "property" && report.secondPropertyCount > 0 && (
                 <p className="px-1 text-xs text-muted">
                   {report.secondPropertyCount} call
                   {report.secondPropertyCount === 1 ? "" : "s"} also covered a second property,
