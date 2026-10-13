@@ -111,13 +111,25 @@ function workbookRelsXml(sheetCount: number): string {
  */
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 
+/**
+ * Excel refuses a sheet name over 31 characters, or one containing any of
+ * : \\ / ? * [ ], so both are dealt with here rather than producing a file
+ * that will not open.
+ *
+ * Order matters: the length limit is on the name Excel shows, and escaping
+ * turns one `&` into five characters, so cutting after escaping would both
+ * lose real characters and risk slicing an entity in half.
+ */
+function sheetName(name: string, index: number): string {
+  const safe = name.replace(/[:\\/?*[\]]/g, " ").trim().slice(0, 31).trim();
+  return xmlEscape(safe === "" ? `Sheet${index + 1}` : safe);
+}
+
 function workbookXml(names: string[]): string {
   const sheets = names
     .map(
       (name, i) =>
-        // Excel refuses a sheet name over 31 characters, so it is cut here
-        // rather than producing a file that will not open.
-        `<sheet name="${xmlEscape(name).slice(0, 31)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`,
+        `<sheet name="${sheetName(name, i)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`,
     )
     .join("");
 

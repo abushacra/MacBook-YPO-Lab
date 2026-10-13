@@ -58,3 +58,43 @@ export async function requireAdmin(): Promise<CurrentUser> {
   if (!user.is_admin) redirect("/");
   return user;
 }
+
+/**
+ * Reports are open to chiefs as well as admins, but they are not the same
+ * report: a chief sees their own team, and no money. See
+ * `canSeeReportAmounts`.
+ */
+export function canRunReports(user: CurrentUser): boolean {
+  return user.is_admin || user.is_chief;
+}
+
+export async function requireReportAccess(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (!canRunReports(user)) redirect("/");
+  return user;
+}
+
+/**
+ * An amount on a service call is what the engineer is paid for it, so it is a
+ * pay rate by another name and stays admin-only — the same rule that keeps
+ * rates off the service call form and out of an engineer's own history. A
+ * chief gets the counts, which is what chasing unpaid work actually needs.
+ */
+export function canSeeReportAmounts(user: CurrentUser): boolean {
+  return user.is_admin;
+}
+
+/**
+ * Who may add an engineer or a vendor. A chief can staff their own team; what
+ * they cannot do is grant admin, mint another chief, or move someone onto a
+ * different chief's team — `addTechnician` forces all three.
+ */
+export function canAddPeople(user: CurrentUser): boolean {
+  return user.is_admin || user.is_chief;
+}
+
+export async function requirePeopleAccess(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (!canAddPeople(user)) redirect("/");
+  return user;
+}

@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Item = { href: string; label: string; icon: "home" | "clipboard" | "receipt" | "gear" };
+type Item = {
+  href: string;
+  label: string;
+  icon: "home" | "clipboard" | "receipt" | "gear" | "people";
+};
 
 export function BottomNav({
   isAdmin,
+  isChief,
   showReceipts,
 }: {
   isAdmin: boolean;
+  isChief: boolean;
   showReceipts: boolean;
 }) {
   const pathname = usePathname();
@@ -20,7 +26,12 @@ export function BottomNav({
     ...(showReceipts
       ? [{ href: "/expenses", label: "Receipts", icon: "receipt" } as const]
       : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: "gear" } as const] : []),
+    // Admin covers everything Team does and more, so only one of the two shows.
+    ...(isAdmin
+      ? [{ href: "/admin", label: "Admin", icon: "gear" } as const]
+      : isChief
+        ? [{ href: "/team", label: "Team", icon: "people" } as const]
+        : []),
   ];
 
   return (
@@ -59,6 +70,8 @@ function NavIcon({ name, filled }: { name: Item["icon"]; filled: boolean }) {
     clipboard:
       "M9 4.5h6M8 6.5H6.5A1.5 1.5 0 0 0 5 8v11.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8a1.5 1.5 0 0 0-1.5-1.5H16M9 3.5h6v3H9zM8.5 11.5h7M8.5 15.5h4.5",
     receipt: "M6 3.5h12v17l-2.4-1.6-2.4 1.6-2.4-1.6L8.4 20.5 6 18.9zM9.5 8.5h5M9.5 12.5h5",
+    people:
+      "M8.5 11a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM2.8 19.5a5.7 5.7 0 0 1 11.4 0M16 11.2a2.6 2.6 0 1 0 0-5.2M17.2 14.2a4.8 4.8 0 0 1 4 5.3",
     gear: "M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM19.4 12a7.4 7.4 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7.3 7.3 0 0 0-2-1.2l-.3-2.5h-4l-.3 2.5a7.3 7.3 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5a7.4 7.4 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7.3 7.3 0 0 0 2 1.2l.3 2.5h4l.3-2.5a7.3 7.3 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.07-.4.1-.8.1-1.2z",
   };
 

@@ -10,7 +10,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <AppHeader user={user} />
       {/* Bottom padding clears the fixed nav plus the iOS home indicator. */}
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pt-5 pb-28">{children}</main>
-      <BottomNav isAdmin={user.is_admin} showReceipts={canLogReceipts(user)} />
+      <BottomNav
+        isAdmin={user.is_admin}
+        isChief={user.is_chief}
+        showReceipts={canLogReceipts(user)}
+      />
     </>
   );
 }

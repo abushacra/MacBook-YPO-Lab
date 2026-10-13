@@ -34,6 +34,8 @@ export type ReportPropertyRow = {
 /** One service call, as it appears in the detail list under its engineer. */
 export type ReportCallRow = {
   date: string;
+  /** The property this call is counted under — its first one. */
+  propertyId: string;
   property: string;
   secondProperty: string | null;
   hoursType: HoursType;
@@ -83,11 +85,53 @@ export type ReportPropertyGroup = {
   amount: number;
   unpricedCount: number;
   engineers: ReportPropertyEngineer[];
+  /** Every call at this property, oldest first, for the one-page-per-property view. */
+  calls: (ReportCallRow & { engineerName: string })[];
+};
+
+/** Which calls the report is built from. Everything here narrows the range. */
+export type ReportFilters = {
+  /**
+   * Paid means the call was on a pay run an admin marked billed — the same
+   * `billed_at` the Service Calls screen and the next pay run go by.
+   */
+  paid: PaidFilter;
+  /**
+   * The only people this reader may see at all. A chief gets their own team;
+   * null is everyone, which is what an admin gets. Not a screen the reader
+   * chose — a boundary they cannot widen.
+   */
+  visibleTechnicianIds: string[] | null;
+  /** Screen down to one person, or one property. Null means all of them. */
+  technicianId: string | null;
+  propertyId: string | null;
+};
+
+export const PAID_FILTERS = ["unpaid", "paid", "all"] as const;
+export type PaidFilter = (typeof PAID_FILTERS)[number];
+
+export function asPaidFilter(value: string): PaidFilter {
+  return (PAID_FILTERS as readonly string[]).includes(value) ? (value as PaidFilter) : "all";
+}
+
+export const ALL_CALLS: ReportFilters = {
+  paid: "all",
+  visibleTechnicianIds: null,
+  technicianId: null,
+  propertyId: null,
 };
 
 export type ServiceCallReport = {
   from: string;
   to: string;
+  filters: ReportFilters;
+  /**
+   * Calls left out of a property screen because that property was their
+   * second, not their first. They are counted under their first property
+   * everywhere in this report, so including them here would show a group for
+   * a property nobody asked for.
+   */
+  secondPropertyOnlyCount: number;
   people: ReportPersonRow[];
   /** The same work grouped the other way: property first, engineers under it. */
   properties: ReportPropertyGroup[];
@@ -113,22 +157,42 @@ export type ReportCall = {
   follow_up_needed: boolean;
   description: string | null;
   billed_amount: number | null;
+  billed_at: string | null;
 };
 
-export async function buildReport(from: string, to: string): Promise<ServiceCallReport> {
-  const [{ data: calls }, { data: technicians }, { data: properties }] = await Promise.all([
-    db()
-      .from("service_calls")
-      .select(
-        "technician_id, call_date, property_id, property_label, space_label, property_id_2, property_label_2, space_label_2, hours_type, call_type, approval_status, follow_up_needed, description, billed_amount",
-      )
-      .gte("call_date", from)
-      .lte("call_date", to),
+export async function buildReport(
+  from: string,
+  to: string,
+  filters: ReportFilters = ALL_CALLS,
+): Promise<ServiceCallReport> {
+  let calls = db()
+    .from("service_calls")
+    .select(
+      "technician_id, call_date, property_id, property_label, space_label, property_id_2, property_label_2, space_label_2, hours_type, call_type, approval_status, follow_up_needed, description, billed_amount, billed_at",
+    )
+    .gte("call_date", from)
+    .lte("call_date", to);
+
+  if (filters.paid === "unpaid") calls = calls.is("billed_at", null);
+  if (filters.paid === "paid") calls = calls.not("billed_at", "is", null);
+
+  /*
+   * The visibility boundary and the chosen screen are both applied in the
+   * query, so a call the reader may not see never reaches the grouping. An
+   * empty allow-list means exactly that — no rows — rather than everyone.
+   */
+  if (filters.visibleTechnicianIds !== null) {
+    calls = calls.in("technician_id", filters.visibleTechnicianIds);
+  }
+  if (filters.technicianId !== null) calls = calls.eq("technician_id", filters.technicianId);
+
+  const [{ data: rows }, { data: technicians }, { data: properties }] = await Promise.all([
+    calls,
     db().from("technicians").select("id, name, kind"),
     db().from("properties").select("id, name"),
   ]);
 
-  return groupReport(from, to, calls ?? [], technicians ?? [], properties ?? []);
+  return groupReport(from, to, rows ?? [], technicians ?? [], properties ?? [], filters);
 }
 
 /** The grouping, kept free of the database so the totals can be tested directly. */
@@ -138,13 +202,28 @@ export function groupReport(
   calls: ReportCall[],
   technicians: { id: string; name: string; kind: string }[],
   properties: { id: string; name: string }[],
+  filters: ReportFilters = ALL_CALLS,
 ): ServiceCallReport {
   const technicianById = new Map(technicians.map((row) => [row.id, row]));
   const propertyNameById = new Map(properties.map((row) => [row.id, row.name]));
 
   const people = new Map<string, ReportPersonRow & { byProperty: Map<string, ReportPropertyRow> }>();
 
+  /*
+   * The property screen is applied here rather than in the query so these can
+   * be counted: a call that named the screened property second is counted
+   * under its first property everywhere in this report, so letting it in would
+   * put a group on the page for a property nobody screened for. It is reported
+   * as a footnote instead of being silently dropped.
+   */
+  let secondPropertyOnlyCount = 0;
+
   for (const call of calls) {
+    if (filters.propertyId !== null && call.property_id !== filters.propertyId) {
+      if (call.property_id_2 === filters.propertyId) secondPropertyOnlyCount += 1;
+      continue;
+    }
+
     let person = people.get(call.technician_id);
     if (person === undefined) {
       const technician = technicianById.get(call.technician_id);
@@ -211,6 +290,7 @@ export function groupReport(
     // the same thing.
     person.calls.push({
       date: call.call_date,
+      propertyId: call.property_id,
       property: formatLocation(call.property_label, call.space_label),
       secondProperty: call.property_label_2
         ? formatLocation(call.property_label_2, call.space_label_2)
@@ -242,6 +322,8 @@ export function groupReport(
   return {
     from,
     to,
+    filters,
+    secondPropertyOnlyCount,
     people: rows,
     properties: byProperty(rows),
     callCount: Math.round(sum((person) => person.callCount) * 100) / 100,
@@ -273,8 +355,15 @@ function byProperty(people: ReportPersonRow[]): ReportPropertyGroup[] {
           amount: 0,
           unpricedCount: 0,
           engineers: [],
+          calls: [],
         };
         groups.set(row.propertyId, group);
+      }
+
+      for (const call of person.calls) {
+        if (call.propertyId === row.propertyId) {
+          group.calls.push({ ...call, engineerName: person.name });
+        }
       }
 
       group.callCount = Math.round((group.callCount + row.callCount) * 100) / 100;
@@ -298,6 +387,11 @@ function byProperty(people: ReportPersonRow[]): ReportPropertyGroup[] {
       ...group,
       engineers: [...group.engineers].sort(
         (a, b) => byBusiest(a, b) || a.name.localeCompare(b.name),
+      ),
+      // Oldest first, as the by-engineer detail reads, so a property's page and
+      // an engineer's page show the same call in the same order.
+      calls: [...group.calls].sort(
+        (a, b) => a.date.localeCompare(b.date) || a.engineerName.localeCompare(b.engineerName),
       ),
     }))
     .sort((a, b) => byBusiest(a, b) || a.propertyName.localeCompare(b.propertyName));

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requirePeopleAccess } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { RATE_SLOTS, TECHNICIAN_KINDS } from "@/lib/constants";
 import {
@@ -16,6 +16,7 @@ import {
 
 function refreshAdminViews(): void {
   revalidatePath("/admin");
+  revalidatePath("/team");
   revalidatePath("/calls/new");
   revalidatePath("/expenses/new");
 }
@@ -125,7 +126,7 @@ const technicianSchema = z.object({
 });
 
 export async function addTechnician(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireAdmin();
+  const user = await requirePeopleAccess();
 
   const parsed = technicianSchema.safeParse({
     name: text(formData, "name"),
@@ -135,6 +136,15 @@ export async function addTechnician(_prev: FormState, formData: FormData): Promi
     return { error: "Check the form.", fieldErrors: toFieldErrors(parsed.error) };
   }
 
+  /*
+   * A chief staffs their own team and nothing more. Granting admin, minting
+   * another chief and choosing someone else's team are all forced here rather
+   * than merely hidden on the form, because a form field is a suggestion and
+   * this is the rule. Their new hire reports to them, which is what puts the
+   * person's calls in front of them for approval.
+   */
+  const asAdmin = user.is_admin;
+
   // No PIN is set here: the person picks their own the first time they open
   // the app, so nobody has to hand out a starter PIN.
   const { data: created, error } = await db()
@@ -143,10 +153,10 @@ export async function addTechnician(_prev: FormState, formData: FormData): Promi
       name: parsed.data.name,
       kind: parsed.data.kind,
       company: optionalText(formData, "company"),
-      is_admin: checkbox(formData, "is_admin"),
+      is_admin: asAdmin && checkbox(formData, "is_admin"),
       // Only in-house engineers can be chiefs; the database enforces this too.
-      is_chief: parsed.data.kind === "in_house" && checkbox(formData, "is_chief"),
-      chief_id: chiefIdFrom(formData),
+      is_chief: asAdmin && parsed.data.kind === "in_house" && checkbox(formData, "is_chief"),
+      chief_id: asAdmin ? chiefIdFrom(formData) : user.id,
     })
     .select("id")
     .single();
@@ -354,18 +364,28 @@ export async function deleteSpace(formData: FormData): Promise<void> {
  * someone has already been paid for.
  */
 export async function saveTechnicianRates(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireAdmin();
+  const user = await requirePeopleAccess();
 
   const id = idFrom(formData);
   if (!id) return { error: "Unknown person." };
 
   const { data: technician } = await db()
     .from("technicians")
-    .select("id, kind")
+    .select("id, kind, chief_id")
     .eq("id", id)
     .maybeSingle();
 
   if (!technician) return { error: "Unknown person." };
+
+  /*
+   * A chief sets the rate of someone they hired, so they can also correct it.
+   * Only for their own team though, and never their own rate — what a chief is
+   * paid stays with the admin.
+   */
+  if (!user.is_admin && (technician.chief_id !== user.id || technician.id === user.id)) {
+    return { error: "You can only set rates for your own team." };
+  }
+
   if (technician.kind !== "in_house") {
     return { error: "Rates apply to in-house engineers. Vendors quote each call." };
   }

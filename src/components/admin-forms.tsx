@@ -64,7 +64,19 @@ export function AddSpaceForm({ properties }: { properties: { id: string; name: s
   );
 }
 
-export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: string }[] }) {
+export function AddTechnicianForm({
+  chiefs,
+  /**
+   * Whether this person may grant admin, mint a chief, or put the new hire on
+   * someone else's team. A chief cannot, so those controls are not drawn —
+   * `addTechnician` forces the same three server side, which is what actually
+   * holds.
+   */
+  canPromote = true,
+}: {
+  chiefs: { id: string; name: string }[];
+  canPromote?: boolean;
+}) {
   const { state, formAction, formRef } = useResettingAction(addTechnician);
   const [kind, setKind] = useState<string>("in_house");
   const [isChief, setIsChief] = useState(false);
@@ -96,12 +108,18 @@ export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: stri
         <input id="new-tech-company" name="company" className="input" placeholder="Ace Mechanical" />
       </Field>
 
-      <label className="flex min-h-13 cursor-pointer items-center gap-3">
-        <input type="checkbox" name="is_admin" className="size-6 shrink-0 rounded accent-brand-600" />
-        <span className="text-base font-semibold">Can manage properties and people</span>
-      </label>
+      {canPromote && (
+        <label className="flex min-h-13 cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            name="is_admin"
+            className="size-6 shrink-0 rounded accent-brand-600"
+          />
+          <span className="text-base font-semibold">Can manage properties and people</span>
+        </label>
+      )}
 
-      {kind === "in_house" && (
+      {canPromote && kind === "in_house" && (
         <label className="flex min-h-13 cursor-pointer items-center gap-3">
           <input
             type="checkbox"
@@ -116,7 +134,7 @@ export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: stri
         </label>
       )}
 
-      {!isChief && chiefs.length > 0 && (
+      {canPromote && !isChief && chiefs.length > 0 && (
         <Field
           label="Reports to"
           htmlFor="new-tech-chief"
@@ -145,6 +163,12 @@ export function AddTechnicianForm({ chiefs }: { chiefs: { id: string; name: stri
         <p className="rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-900">
           Vendors enter the amount they agreed on each service call, so there are no
           rates to set here.
+        </p>
+      )}
+
+      {!canPromote && (
+        <p className="rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-900">
+          They join your team, so their service calls come to you for approval.
         </p>
       )}
 

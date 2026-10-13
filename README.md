@@ -335,6 +335,81 @@ A call covering two properties is counted **once, under the first**, the same
 choice the pay run makes — so the property subtotals always add up to the
 engineer's total. The count of such calls is shown at the foot.
 
+## Who can run a report
+
+Reports are open to **admins and chief engineers**, and they are not the same
+report.
+
+A chief sees **their own team**: themselves plus everyone whose chief they are,
+which is the same set whose service calls route to them for approval. Nobody
+else appears, whatever the URL asks for. A screen naming someone outside that
+boundary returns nothing rather than quietly widening to everyone — dropping an
+out-of-bounds screen would do exactly that.
+
+A chief sees **no amounts**. What a call was billed at is what the engineer is
+paid for it, so it is a pay rate by another name, and the same rule that keeps
+rates off the service call form keeps them out of a chief's report: no money
+column on screen, none in the spreadsheet, and the Receipts view is hidden
+outright because it is money and nothing else. The counts are what chasing
+unpaid work needs. `canSeeReportAmounts` is the one place that decides this.
+
+The boundary lives in `reportFiltersFor`, which both the screen and the Excel
+download call, because a download is a plain URL anyone can edit.
+
+## Screening a report
+
+Four controls, and they compose rather than resetting one another:
+
+| Control | What it does |
+| --- | --- |
+| **From / To** | The date range. Defaults to the month so far. |
+| **Unpaid / Paid / Paid & unpaid** | By the same `billed_at` the Service Calls screen and the next pay run go by. |
+| **Engineer or vendor** | One person, or everyone the reader may see. |
+| **Property** | One property, or all of them. |
+
+A property screen matches the property a call is **counted under** — its first.
+A call that named the screened property second is counted under its own first
+property everywhere in this report, so letting it in would put a group on the
+page for a building nobody asked for. Those calls are reported in a footnote
+instead of being silently dropped.
+
+## One page, or one tab, each
+
+Both main views offer **One long report** or **One page per property / per
+engineer**. The second is what turns the print dialog into a per-property PDF:
+each block starts a fresh page, so a single building's or a single person's work
+can be handed over without the rest. A block is still allowed to break
+internally — a property with eighty calls has to run on.
+
+The Excel download always carries the same breakdown as tabs: **By engineer**,
+**By property** and **Detail**, then **one tab per property** and **one tab per
+engineer**, each with its own heading, its own call list and its own total. Past
+40 of either the per-tab breakdown stops and the summary sheet says so; every
+property and person is still listed there.
+
+Sheet names come from property and person names, which collide and overrun.
+Excel refuses a name over 31 characters, one containing `: \ / ? * [ ]`, or two
+of the same name, so `uniqueNames` folds the illegal characters to spaces, cuts
+to 31 and appends a counter on a clash. The cut happens **before** XML escaping,
+because escaping turns one `&` into five characters — cutting afterwards would
+both lose real characters and risk slicing an entity in half, producing a file
+Excel will not open.
+
+## What a chief engineer can do with people
+
+A chief gets a **Team** screen: the people reporting to them, and a form to add
+an engineer or an outside vendor. They can set and correct a rate for someone on
+their own team, since they are the one hiring.
+
+What a chief cannot do is grant admin, mint another chief, move someone onto a
+different chief's team, or touch their own rate. Those are forced in
+`addTechnician` and `saveTechnicianRates` rather than merely hidden on the form,
+because a hidden form field is a suggestion and this is a rule. A chief's new
+hire always reports to the chief who added them, which is what puts that
+person's calls in front of them for approval.
+
+Deactivating someone, resetting a PIN and deleting a person stay with the admin.
+
 ## Receipts report and the QuickBooks expense upload
 
 **Admin → Report → Receipts** lists the period's credit card receipts grouped by

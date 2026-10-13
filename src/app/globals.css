@@ -155,4 +155,18 @@ input[type="number"]::-webkit-inner-spin-button {
     background: #fff !important;
     color: #000 !important;
   }
+
+  /*
+   * One printed page per property or per engineer, for handing a single
+   * building's or a single person's work to someone who should not receive
+   * the rest. The block is allowed to break internally — a property with
+   * eighty calls has to run on — but the next one always starts a fresh page.
+   */
+  .report-page {
+    break-inside: auto;
+  }
+
+  .report-page + .report-page {
+    break-before: page;
+  }
 }

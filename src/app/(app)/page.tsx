@@ -52,6 +52,13 @@ export default async function HomePage() {
         </Link>
       )}
 
+      {/* A chief has no Admin tab, so this is their way to the report. */}
+      {user.is_chief && !user.is_admin && (
+        <Link href="/reports?paid=unpaid" className="btn-secondary w-full py-4 text-lg">
+          Unpaid service call report
+        </Link>
+      )}
+
       {(user.is_chief || user.is_admin) && <PushToggle />}
 
       {(user.is_chief || user.is_admin) && (pendingCount ?? 0) > 0 && (
