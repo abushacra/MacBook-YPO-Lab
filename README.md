@@ -469,46 +469,45 @@ Deactivating someone, resetting a PIN and deleting a person stay with the admin.
 
 ## Receipts report and the QuickBooks expense upload
 
-**Admin → Report → Receipts** lists the period's credit card receipts grouped by
-the property they were charged to, each with its merchant, category, who logged
-it and whether a file is attached. A return is a negative amount, so it nets off
-inside its property's total. Receipts with no image or PDF are counted, since
-there is nothing to send an accountant for those.
-
-**Download for QuickBooks** gives a **ZIP**, not a bare CSV:
+An admin runs the period's credit card receipts by property from **Reports →
+Receipts**, and downloads a ZIP holding three things:
 
 | In the ZIP | What it is |
 | --- | --- |
-| `expenses.csv` | the expense import, matching Intuit's `sample_expenses_import` template — the same eighteen headers, UTF-8 BOM, CRLF, MM/DD/YYYY |
-| `receipts/KAPA-EXP-…` | each receipt image or PDF, named with the Ref No. on its row |
-| `receipts-manifest.csv` | ref, property, date, amount and file name, tying the two together |
+| `expenses.csv` | The QuickBooks expense import, one row per receipt. |
+| `receipts/<property>.pdf` | **One combined PDF per property**, that property's receipts a page each. |
+| `receipts-manifest.csv` | Every Ref No. with the PDF and page number holding its receipt. |
 
-**QuickBooks' expense import has no column for an attachment**, so the files
-cannot ride in the CSV. Naming each one after its Ref No. is what makes attaching
-them afterwards a matter of matching names rather than hunting through a date
-range. A receipt whose file has gone missing from storage is skipped rather than
-failing the download, and the manifest says so.
+**QuickBooks' expense import has no column for an attachment**, so no file can
+ride in the CSV — that is a limit of the format, not of this app. One PDF per
+property is what actually gets filed: it is the bundle a property's owner or an
+accountant is sent, and attaching one document beats attaching fourteen loose
+photos. Every page names the Ref No. its CSV row carries, so a receipt can
+still be matched to its expense line, and the manifest gives the page number
+for pulling a single one out.
 
-Each receipt is one expense with one `Category Details` line, carrying the
-property in `Customer/Project` with `Billable` set. A return exports as a
-negative amount, which is how QuickBooks records a credit back to the card. The
-names live in `src/lib/quickbooks.ts` beside the bill ones:
+`src/lib/pdf.ts` writes the PDF, dependency-free like the ZIP and XLSX writers
+beside it. A JPEG goes in **untouched**: PDF carries JPEG-compressed data
+natively through the `DCTDecode` filter, so the bytes are copied straight
+across with no decoding, no re-encoding and no loss of what the camera caught.
+Each photo is scaled to fit under its caption, keeping its aspect ratio, and is
+never enlarged past its own pixels — blowing a thumbnail up to fill a page only
+makes the blur bigger.
 
-| | |
-| --- | --- |
-| Payment account | `KPC Chase (autopay)` |
-| Payment method | `Credit Card` |
-| Category | `Reimbursable Expenses` |
-| Location | `Limited - Kapa Capital` |
-| Payee, every expense | `Credit Card Purchase` |
+Two things get a page of their own rather than being dropped:
 
-The `Memo` carries the Ref No., then the merchant, then who logged it, so a card
-statement can be reconciled from that column alone.
+- **A receipt with no file**, which says so. Nothing is quietly missing from
+  the bundle.
+- **A file that is not a JPEG** — a PDF receipt, a PNG, a HEIC the browser
+  could not convert. Those cannot be placed on a page without a decoder this
+  app deliberately does not carry, so the original stays in the ZIP as its own
+  file and its page says where to find it. Every receipt logged so far is a
+  JPEG, because the uploader converts camera photos in the browser.
 
-Every expense is paid to **one payee for the card** rather than a vendor per
-shop: the card is what was paid, and the shop is a detail of the charge. The
-merchant is not lost — it leads the `Description`, ahead of the app's own
-category and note.
+Property names become file names, so they are stripped of anything that would
+make a path inside the ZIP, and two that sanitise alike get a counter rather
+than overwriting each other.
+
 
 ## Pay run — bills for QuickBooks Online
 

@@ -323,10 +323,11 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                   <MapRow label="Location, every expense" value={BILL_LOCATION} />
                 </dl>
                 <p className="mt-3 text-xs text-muted">
-                  The download is a ZIP: the expense import CSV, the receipt images each
-                  named with the Ref No. on its row, and a manifest tying the two together.
-                  QuickBooks&apos; expense import has no column for an attachment, so the
-                  files cannot ride in the CSV — attach them afterwards by matching the name.
+                  The download is a ZIP: the expense import CSV, one combined PDF per
+                  property holding that property&apos;s receipts a page each, and a manifest
+                  giving the PDF and page number for every Ref No. QuickBooks&apos; expense
+                  import has no column for an attachment, so nothing can ride in the CSV —
+                  attach the property PDF, or pull the page out of it, afterwards.
                 </p>
               </section>
 
