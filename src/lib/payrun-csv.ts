@@ -94,7 +94,7 @@ export function payRunCsv(payRun: PayRun): string {
               // crossing to the Customer column. Quantity and Rate are columns
               // of their own, so repeating them here would only read like the
               // line was counted twice.
-              description: `${line.customerName} \u00b7 Service calls \u2014 ${period}`,
+              description: `${line.propertyName} \u00b7 Service calls \u2014 ${period}`,
             }
           : {
               type: "Category Details",
@@ -103,7 +103,7 @@ export function payRunCsv(payRun: PayRun): string {
               quantity: "",
               rate: "",
               // A category row has no Quantity column, so the count belongs here.
-              description: `${line.customerName} \u00b7 ${calls} \u2014 ${period}`,
+              description: `${line.propertyName} \u00b7 ${calls} \u2014 ${period}`,
             };
 
       rows.push(
@@ -126,7 +126,11 @@ export function payRunCsv(payRun: PayRun): string {
           detail.description,
           line.amount.toFixed(2),
           "TRUE",
-          line.customerName,
+          // The mapped QuickBooks customer, not the property name — several
+          // buildings can share one customer, and this column has to match a
+          // customer that exists or the import invents a new one. The property
+          // itself is named in the description above.
+          line.quickbooksCustomer,
           "", // Tax Rate
           "", // Class
         ]

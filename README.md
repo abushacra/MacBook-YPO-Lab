@@ -509,6 +509,31 @@ make a path inside the ZIP, and two that sanitise alike get a counter rather
 than overwriting each other.
 
 
+## Properties and QuickBooks customers
+
+A property is not a customer. Several buildings can be reimbursed by one
+customer — four of yours bill to `(KCL) L&L 92 LLC` — so the customer is stored
+against the property in `properties.quickbooks_customer` rather than derived
+from its name.
+
+That split runs through both imports:
+
+| Column | What goes in it |
+| --- | --- |
+| **Customer** | The mapped QuickBooks customer, exactly as stored. |
+| **Description / line text** | The **property** name, so a customer with four buildings gets four lines it can tell apart. |
+
+It is stored exactly as typed, case and punctuation included, because the
+import matches on the whole string — and a name that does not match is created
+as a **new customer** rather than refused, which is tedious to undo. A property
+with nothing mapped falls back to sending its own name, which is what every
+import did before this existed; the pay run flags those lines as **No
+QuickBooks customer mapped** so a fallback is never silent.
+
+An admin sets it per property in **Admin → Properties**, and on the Add a
+property form. Changing it affects future downloads only — a bill already
+imported into QuickBooks is QuickBooks' business from then on.
+
 ## Pay run — bills for QuickBooks Online
 
 **Admin → Pay run** turns logged work into vendor bills. Pick a date range and

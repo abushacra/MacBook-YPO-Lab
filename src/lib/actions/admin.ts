@@ -72,7 +72,11 @@ export async function addProperty(_prev: FormState, formData: FormData): Promise
 
   const { error } = await db()
     .from("properties")
-    .insert({ name: parsed.data.name, address: optionalText(formData, "address") });
+    .insert({
+      name: parsed.data.name,
+      address: optionalText(formData, "address"),
+      quickbooks_customer: optionalText(formData, "quickbooks_customer"),
+    });
 
   if (error) {
     return {
@@ -85,6 +89,26 @@ export async function addProperty(_prev: FormState, formData: FormData): Promise
 
   refreshAdminViews();
   return { ok: true };
+}
+
+/**
+ * Sets the QuickBooks customer a property's work is billed to.
+ *
+ * Stored exactly as typed, including case and punctuation: the import matches
+ * on the whole string, and a customer that does not match is created as a new
+ * one rather than refused. Blank clears it, which falls the import back to the
+ * property's own name.
+ */
+export async function setPropertyCustomer(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = idFrom(formData);
+  if (!id) return;
+
+  const customer = optionalText(formData, "quickbooks_customer");
+  await db().from("properties").update({ quickbooks_customer: customer }).eq("id", id);
+  refreshAdminViews();
+  revalidatePath("/payrun");
+  revalidatePath("/reports");
 }
 
 const spaceSchema = z.object({

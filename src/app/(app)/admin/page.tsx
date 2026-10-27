@@ -19,6 +19,7 @@ import {
   AddPropertyForm,
   AddSpaceForm,
   AddTechnicianForm,
+  PropertyCustomerForm,
   TechnicianRatesForm,
 } from "@/components/admin-forms";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -75,7 +76,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
 async function PropertiesTab() {
   const [{ data: properties }, { data: spaces }, { data: usage }] = await Promise.all([
-    db().from("properties").select("id, name, address, active").order("name"),
+    db()
+      .from("properties")
+      .select("id, name, address, active, quickbooks_customer")
+      .order("name"),
     db().from("spaces").select("id, name, property_id, active").order("name"),
     db().from("property_usage").select("property_id, service_call_count, expense_count"),
   ]);
@@ -125,6 +129,11 @@ async function PropertiesTab() {
                       <p className="truncate text-sm text-muted">{property.address}</p>
                     )}
                   </div>
+
+                  <PropertyCustomerForm
+                    propertyId={property.id}
+                    customer={property.quickbooks_customer}
+                  />
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     <form action={setPropertyActive}>

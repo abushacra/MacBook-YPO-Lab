@@ -117,7 +117,10 @@ export function expenseCsv(report: ReceiptsReport): string {
         description || "Credit card charge",
         receipt.amount.toFixed(2),
         "TRUE",
-        group.propertyName,
+        // The mapped QuickBooks customer, not the property name — several
+        // buildings can share one, and this column has to match a customer
+        // that exists or the import invents a new one.
+        group.quickbooksCustomer,
         "", // Tax Rate
         "", // Class
       ]

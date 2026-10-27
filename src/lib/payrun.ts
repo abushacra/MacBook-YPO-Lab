@@ -27,8 +27,18 @@ import { splitCall } from "@/lib/split";
 
 type PayRunLineBase = {
   propertyId: string;
-  /** The property's current name, which is what must match the QuickBooks customer. */
-  customerName: string;
+  /** The property's current name, as the app and the engineers know it. */
+  propertyName: string;
+  /**
+   * The QuickBooks customer this property's work is reimbursed by, which is
+   * what the Customer column must match exactly.
+   *
+   * Not the same thing as the property name, and not derivable from it:
+   * several buildings can share one customer. The property name still leads
+   * each line's description, so a customer with four buildings gets four
+   * lines it can tell apart.
+   */
+  quickbooksCustomer: string;
   /**
    * Service calls, weighted by charge: a x 1.5 call counts as 1.5 and a x 2 as
    * 2. This is the Quantity on the bill line.
@@ -112,7 +122,7 @@ export async function buildPayRun(from: string, to: string): Promise<PayRun> {
       .gte("call_date", from)
       .lte("call_date", to),
     db().from("technicians").select("id, name, kind, is_chief"),
-    db().from("properties").select("id, name"),
+    db().from("properties").select("id, name, quickbooks_customer"),
   ]);
 
   return groupPayRun(
@@ -133,10 +143,10 @@ export function groupPayRun(
   to: string,
   shifts: PayRunShift[],
   technicians: { id: string; name: string; kind: string; is_chief: boolean }[],
-  properties: { id: string; name: string }[],
+  properties: { id: string; name: string; quickbooks_customer: string | null }[],
 ): PayRun {
   const technicianById = new Map(technicians.map((row) => [row.id, row]));
-  const propertyNameById = new Map(properties.map((row) => [row.id, row.name]));
+  const propertyById = new Map(properties.map((row) => [row.id, row]));
 
   let unpricedCount = 0;
   let unapprovedCount = 0;
@@ -202,11 +212,17 @@ export function groupPayRun(
 
       let entry = byProperty.get(key);
       if (entry === undefined) {
+        const property = propertyById.get(share.propertyId);
+        // The live name, falling back to the label stored on the call if the
+        // property was renamed or removed out from under us.
+        const propertyName = property?.name ?? share.propertyLabel;
         const base = {
           propertyId: share.propertyId,
-          // The live name is what must match the QuickBooks customer; the stored
-          // label is the fallback if the property was renamed out from under us.
-          customerName: propertyNameById.get(share.propertyId) ?? share.propertyLabel,
+          propertyName,
+          // Without a mapping the property name is sent, which is what the app
+          // did before customers were mapped at all. The pay run screen says
+          // which properties are in that state.
+          quickbooksCustomer: property?.quickbooks_customer ?? propertyName,
           shiftCount: 0,
           amount: 0,
         };
@@ -228,7 +244,7 @@ export function groupPayRun(
     .map(([technicianId, byProperty]) => {
       const entries = [...byProperty.values()].sort(
         (a, b) =>
-          a.line.customerName.localeCompare(b.line.customerName) ||
+          a.line.propertyName.localeCompare(b.line.propertyName) ||
           lineRate(b.line) - lineRate(a.line),
       );
       const technician = technicianById.get(technicianId);

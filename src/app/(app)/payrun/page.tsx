@@ -192,7 +192,19 @@ export default async function PayRunPage({ searchParams }: PageProps<"/payrun">)
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold">
-                          {line.customerName}
+                          {line.propertyName}
+                        </span>
+                        {/* What lands in the Customer column, shown here because
+                            it is what the import matches on and it is often not
+                            the property name. */}
+                        <span className="block truncate text-xs text-muted">
+                          {line.quickbooksCustomer === line.propertyName ? (
+                            <span className="font-semibold text-amber-800">
+                              No QuickBooks customer mapped
+                            </span>
+                          ) : (
+                            `→ ${line.quickbooksCustomer}`
+                          )}
                         </span>
                         <span className="block text-xs text-muted">
                           {line.billAs === "item" ? (

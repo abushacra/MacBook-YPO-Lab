@@ -88,6 +88,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          quickbooks_customer: string | null
         }
         Insert: {
           active?: boolean
@@ -95,6 +96,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          quickbooks_customer?: string | null
         }
         Update: {
           active?: boolean
@@ -102,6 +104,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          quickbooks_customer?: string | null
         }
         Relationships: []
       }

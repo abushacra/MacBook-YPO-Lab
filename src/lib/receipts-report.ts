@@ -26,6 +26,13 @@ export type ReceiptRow = {
 export type ReceiptPropertyGroup = {
   propertyId: string;
   propertyName: string;
+  /**
+   * The QuickBooks customer this property's spend is reimbursed by, which is
+   * what the Customer column on the expense import must match. Several
+   * properties can share one, so it is stored rather than derived; it falls
+   * back to the property name when nothing is mapped.
+   */
+  quickbooksCustomer: string;
   amount: number;
   /** Receipts, counting a return as one of them. */
   count: number;
@@ -68,7 +75,7 @@ export async function buildReceiptsReport(from: string, to: string): Promise<Rec
       .gte("expense_date", from)
       .lte("expense_date", to),
     db().from("technicians").select("id, name"),
-    db().from("properties").select("id, name"),
+    db().from("properties").select("id, name, quickbooks_customer"),
   ]);
 
   return groupReceipts(from, to, receipts ?? [], technicians ?? [], properties ?? []);
@@ -80,21 +87,27 @@ export function groupReceipts(
   to: string,
   receipts: ReceiptRecord[],
   technicians: { id: string; name: string }[],
-  properties: { id: string; name: string }[],
+  properties: { id: string; name: string; quickbooks_customer: string | null }[],
 ): ReceiptsReport {
   const nameById = new Map(technicians.map((row) => [row.id, row.name]));
-  const propertyNameById = new Map(properties.map((row) => [row.id, row.name]));
+  const propertyById = new Map(properties.map((row) => [row.id, row]));
 
   const groups = new Map<string, ReceiptPropertyGroup>();
 
   for (const receipt of receipts) {
     let group = groups.get(receipt.property_id);
     if (group === undefined) {
+      const property = propertyById.get(receipt.property_id);
+      // The live name, falling back to the label stored on the receipt if the
+      // property has since been renamed or removed.
+      const propertyName = property?.name ?? receipt.property_label;
+
       group = {
         propertyId: receipt.property_id,
-        // The live name, falling back to the label stored on the receipt if the
-        // property has since been renamed or removed.
-        propertyName: propertyNameById.get(receipt.property_id) ?? receipt.property_label,
+        propertyName,
+        // Unmapped falls back to the property name, which is what the import
+        // carried before customers were mapped at all.
+        quickbooksCustomer: property?.quickbooks_customer ?? propertyName,
         amount: 0,
         count: 0,
         missingFileCount: 0,

@@ -2,7 +2,13 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
-import { addProperty, addSpace, addTechnician, saveTechnicianRates } from "@/lib/actions/admin";
+import {
+  addProperty,
+  addSpace,
+  addTechnician,
+  saveTechnicianRates,
+  setPropertyCustomer,
+} from "@/lib/actions/admin";
 import { EMPTY_FORM_STATE, type FormState } from "@/lib/form-state";
 import { TECHNICIAN_KIND_LABELS, TECHNICIAN_KINDS } from "@/lib/constants";
 import { Field, FormError } from "@/components/field";
@@ -34,8 +40,55 @@ export function AddPropertyForm() {
       <Field label="Address" htmlFor="new-property-address">
         <input id="new-property-address" name="address" className="input" placeholder="100 Main Street" />
       </Field>
+      <Field
+        label="QuickBooks customer"
+        htmlFor="new-property-customer"
+        hint="Copy it exactly as QuickBooks spells it. Several properties can share one. Leave blank to send the property name instead."
+      >
+        <input
+          id="new-property-customer"
+          name="quickbooks_customer"
+          className="input"
+          placeholder="(KCL) L&amp;L 92 LLC"
+        />
+      </Field>
       <FormError message={state.error} />
       <SubmitButton pendingLabel="Adding…">Add property</SubmitButton>
+    </form>
+  );
+}
+
+/**
+ * The QuickBooks customer on a property already in the portfolio.
+ *
+ * A plain uncontrolled form rather than a dialog: this gets edited rarely, and
+ * seeing the current value beside the property is most of the point.
+ */
+export function PropertyCustomerForm({
+  propertyId,
+  customer,
+}: {
+  propertyId: string;
+  customer: string | null;
+}) {
+  return (
+    <form action={setPropertyCustomer} className="mt-3 border-t border-hairline pt-3">
+      <input type="hidden" name="id" value={propertyId} />
+      <label className="field-label" htmlFor={`qb-${propertyId}`}>
+        QuickBooks customer
+      </label>
+      <div className="flex gap-2">
+        <input
+          id={`qb-${propertyId}`}
+          name="quickbooks_customer"
+          defaultValue={customer ?? ""}
+          placeholder="Not mapped — the property name is sent"
+          className="input min-w-0 flex-1 text-sm"
+        />
+        <SubmitButton pendingLabel="Saving…" className="btn-primary w-auto shrink-0 px-4">
+          Save
+        </SubmitButton>
+      </div>
     </form>
   );
 }
