@@ -29,7 +29,9 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
 
   let query = db()
     .from("expenses")
-    .select("id, expense_date, amount, merchant, category, property_label, receipt_path, technician_id")
+    .select(
+      "id, expense_date, amount, merchant, category, property_label, receipt_path, technician_id, exported_at",
+    )
     .order("expense_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(PAGE_SIZE);
@@ -144,6 +146,11 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                 )}
                 {expense.category && (
                   <span className="chip bg-slate-100 text-slate-700">{expense.category}</span>
+                )}
+                {/* Matches the Paid chip on a service call: whether this has
+                    reached QuickBooks is worth seeing without opening it. */}
+                {expense.exported_at !== null && (
+                  <span className="chip bg-emerald-100 text-emerald-900">Exported</span>
                 )}
                 {expense.receipt_path ? (
                   <a

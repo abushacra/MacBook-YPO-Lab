@@ -11,8 +11,24 @@ import { db } from "@/lib/supabase";
  * its property's total rather than being listed apart from it.
  */
 
+/**
+ * Which receipts a run covers. Exported means an admin marked an expense
+ * import done — the mirror of a service call being billed, and the thing that
+ * stops the same receipt reaching QuickBooks twice.
+ */
+export const EXPORT_FILTERS = ["unexported", "exported", "all"] as const;
+export type ExportFilter = (typeof EXPORT_FILTERS)[number];
+
+export function asExportFilter(value: string): ExportFilter {
+  return (EXPORT_FILTERS as readonly string[]).includes(value)
+    ? (value as ExportFilter)
+    : "unexported";
+}
+
 export type ReceiptRow = {
   id: string;
+  /** When this receipt went to QuickBooks, or null while it is outstanding. */
+  exportedAt: string | null;
   date: string;
   merchant: string | null;
   category: string | null;
@@ -45,6 +61,9 @@ export type ReceiptPropertyGroup = {
 export type ReceiptsReport = {
   from: string;
   to: string;
+  filter: ExportFilter;
+  /** In range but left out by the filter, so a short run is never a surprise. */
+  filteredOutCount: number;
   properties: ReceiptPropertyGroup[];
   amount: number;
   count: number;
@@ -63,14 +82,21 @@ export type ReceiptRecord = {
   notes: string | null;
   receipt_path: string | null;
   technician_id: string;
+  exported_at: string | null;
 };
 
-export async function buildReceiptsReport(from: string, to: string): Promise<ReceiptsReport> {
+export async function buildReceiptsReport(
+  from: string,
+  to: string,
+  filter: ExportFilter = "all",
+): Promise<ReceiptsReport> {
+  // Everything in range is fetched and the filter applied in the grouping, so
+  // what the filter left out can be counted rather than silently missing.
   const [{ data: receipts }, { data: technicians }, { data: properties }] = await Promise.all([
     db()
       .from("expenses")
       .select(
-        "id, property_id, property_label, expense_date, amount, merchant, category, notes, receipt_path, technician_id",
+        "id, property_id, property_label, expense_date, amount, merchant, category, notes, receipt_path, technician_id, exported_at",
       )
       .gte("expense_date", from)
       .lte("expense_date", to),
@@ -78,7 +104,26 @@ export async function buildReceiptsReport(from: string, to: string): Promise<Rec
     db().from("properties").select("id, name, quickbooks_customer"),
   ]);
 
-  return groupReceipts(from, to, receipts ?? [], technicians ?? [], properties ?? []);
+  return groupReceipts(from, to, receipts ?? [], technicians ?? [], properties ?? [], filter);
+}
+
+/** The ids a run covers, for stamping them exported. */
+export async function receiptExportIds(
+  from: string,
+  to: string,
+  filter: ExportFilter,
+): Promise<string[]> {
+  let query = db()
+    .from("expenses")
+    .select("id")
+    .gte("expense_date", from)
+    .lte("expense_date", to);
+
+  if (filter === "unexported") query = query.is("exported_at", null);
+  if (filter === "exported") query = query.not("exported_at", "is", null);
+
+  const { data } = await query;
+  return (data ?? []).map((row) => row.id);
 }
 
 /** The grouping, kept free of the database so the totals can be tested directly. */
@@ -88,13 +133,21 @@ export function groupReceipts(
   receipts: ReceiptRecord[],
   technicians: { id: string; name: string }[],
   properties: { id: string; name: string; quickbooks_customer: string | null }[],
+  filter: ExportFilter = "all",
 ): ReceiptsReport {
   const nameById = new Map(technicians.map((row) => [row.id, row.name]));
   const propertyById = new Map(properties.map((row) => [row.id, row]));
 
   const groups = new Map<string, ReceiptPropertyGroup>();
+  let filteredOutCount = 0;
 
   for (const receipt of receipts) {
+    const exported = receipt.exported_at !== null;
+    if ((filter === "unexported" && exported) || (filter === "exported" && !exported)) {
+      filteredOutCount += 1;
+      continue;
+    }
+
     let group = groups.get(receipt.property_id);
     if (group === undefined) {
       const property = propertyById.get(receipt.property_id);
@@ -131,6 +184,7 @@ export function groupReceipts(
       amount: receipt.amount,
       loggedBy: nameById.get(receipt.technician_id) ?? "Unknown",
       receiptPath: receipt.receipt_path,
+      exportedAt: receipt.exported_at,
     });
   }
 
@@ -149,6 +203,8 @@ export function groupReceipts(
   return {
     from,
     to,
+    filter,
+    filteredOutCount,
     properties: rows,
     amount: Math.round(sum((group) => group.amount) * 100) / 100,
     count: sum((group) => group.count),

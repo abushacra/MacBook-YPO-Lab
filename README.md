@@ -509,6 +509,33 @@ make a path inside the ZIP, and two that sanitise alike get a counter rather
 than overwriting each other.
 
 
+## Exported and outstanding receipts
+
+The Receipts view has a **Not exported / Exported / All receipts** filter, and
+**Not exported is the default** — the mirror of the Service Calls screen
+defaulting to unpaid. It is the working list: what still has to reach
+QuickBooks.
+
+Exported means `expenses.exported_at` is set, which happens when an admin
+presses **Mark these receipts as exported** after an import succeeds. Same
+shape as marking a pay run billed, and for the same reason: it is what stops
+the same receipt reaching QuickBooks twice.
+
+Three things keep the button honest:
+
+- **The download carries exactly what the filter shows.** The filter rides on
+  the download URL, so the ZIP can never hold a receipt the screen is hiding,
+  and marking stamps the same window and filter the file was built from.
+- **Nothing in range is silently missing.** What the filter left out is
+  counted and said out loud, and an empty Not exported view says the receipts
+  have all been exported rather than looking like an empty date range.
+- **Marking twice is a no-op.** A second run over the same dates finds nothing
+  outstanding.
+
+An **Exported** chip shows on the receipt in the list and in the report, the
+way a **Paid** chip shows on a service call. Every receipt logged before this
+existed starts outstanding — nothing was marked retroactively.
+
 ## Properties and QuickBooks customers
 
 A property is not a customer. Several buildings can be reimbursed by one

@@ -20,6 +20,8 @@ export type Database = {
           category: string | null
           created_at: string
           expense_date: string
+          export_reference: string | null
+          exported_at: string | null
           id: string
           merchant: string | null
           notes: string | null
@@ -34,6 +36,8 @@ export type Database = {
           category?: string | null
           created_at?: string
           expense_date: string
+          export_reference?: string | null
+          exported_at?: string | null
           id?: string
           merchant?: string | null
           notes?: string | null
@@ -48,6 +52,8 @@ export type Database = {
           category?: string | null
           created_at?: string
           expense_date?: string
+          export_reference?: string | null
+          exported_at?: string | null
           id?: string
           merchant?: string | null
           notes?: string | null

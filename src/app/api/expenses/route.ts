@@ -1,6 +1,11 @@
 import { requireAdmin } from "@/lib/auth";
 import { RECEIPT_BUCKET, db } from "@/lib/supabase";
-import { buildReceiptsReport, type ReceiptPropertyGroup, type ReceiptRow } from "@/lib/receipts-report";
+import {
+  asExportFilter,
+  buildReceiptsReport,
+  type ReceiptPropertyGroup,
+  type ReceiptRow,
+} from "@/lib/receipts-report";
 import { expenseCsv, numberedReceipts } from "@/lib/expense-csv";
 import { buildPdf, readJpeg, type PdfPage } from "@/lib/pdf";
 import { zip, type ZipEntry } from "@/lib/zip";
@@ -34,7 +39,9 @@ export async function GET(request: Request) {
     return new Response("Pick a valid date range.", { status: 400 });
   }
 
-  const report = await buildReceiptsReport(from, to);
+  // The same filter the screen is showing, so the file holds exactly the
+  // receipts the admin is looking at when they press the button.
+  const report = await buildReceiptsReport(from, to, asExportFilter(searchParams.get("exported") ?? ""));
   const text = new TextEncoder();
 
   // Named once, up front: two property names can sanitise to the same file

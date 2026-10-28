@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { canLogReceipts, requireUser } from "@/lib/auth";
+import { canLogReceipts, requireAdmin, requireUser } from "@/lib/auth";
+import { asExportFilter, receiptExportIds } from "@/lib/receipts-report";
 import { RECEIPT_BUCKET, db } from "@/lib/supabase";
 import { alertOversight } from "@/lib/push";
 import { formatMoney } from "@/lib/format";
@@ -164,4 +165,35 @@ export async function deleteExpense(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/expenses");
   redirect("/expenses?deleted=1");
+}
+
+/**
+ * Stamps every receipt the run covered as exported, so a later export cannot
+ * send the same receipt to QuickBooks twice. The mirror of marking a pay run
+ * billed, and like that one it is done after the import succeeds, not before.
+ *
+ * The same window and filter the download used, so what gets stamped is what
+ * was actually in the file rather than whatever is in range now.
+ */
+export async function markReceiptsExported(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const from = text(formData, "from");
+  const to = text(formData, "to");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return;
+
+  const filter = asExportFilter(text(formData, "exported"));
+  const ids = await receiptExportIds(from, to, filter);
+  if (ids.length === 0) return;
+
+  await db()
+    .from("expenses")
+    .update({
+      exported_at: new Date().toISOString(),
+      export_reference: `Expense import ${from} to ${to}`,
+    })
+    .in("id", ids);
+
+  revalidatePath("/reports");
+  revalidatePath("/expenses");
 }

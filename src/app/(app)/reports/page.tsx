@@ -3,7 +3,13 @@ import Link from "next/link";
 import { canSeeReportAmounts, requireReportAccess } from "@/lib/auth";
 import { buildReport, PAID_FILTERS } from "@/lib/report";
 import { reportFiltersFor, reportPeople } from "@/lib/report-scope";
-import { buildReceiptsReport } from "@/lib/receipts-report";
+import {
+  asExportFilter,
+  buildReceiptsReport,
+  EXPORT_FILTERS,
+} from "@/lib/receipts-report";
+import { markReceiptsExported } from "@/lib/actions/expenses";
+import { ConfirmButton } from "@/components/confirm-button";
 import { db } from "@/lib/supabase";
 import { formatCalls, formatDate, formatMoney, todayISO } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
@@ -31,6 +37,12 @@ function defaultRange(): { from: string; to: string } {
   const to = todayISO();
   return { from: `${to.slice(0, 7)}-01`, to };
 }
+
+const EXPORT_LABELS: Record<string, string> = {
+  unexported: "Not exported",
+  exported: "Exported",
+  all: "All receipts",
+};
 
 const PAID_LABELS: Record<string, string> = {
   unpaid: "Unpaid",
@@ -69,6 +81,13 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   /** Continuous on screen; one printed page each is what makes it a per-property PDF. */
   const pages = one(params.pages) === "each" ? "each" : "continuous";
 
+  /*
+   * Which receipts the Receipts view covers. Not exported is the default and
+   * the working list — what still has to reach QuickBooks — the same way the
+   * Service Calls screen defaults to unpaid.
+   */
+  const exported = asExportFilter(one(params.exported));
+
   const filters = await reportFiltersFor(user, {
     paid: one(params.paid) || "all",
     technicianId: one(params.technician),
@@ -77,7 +96,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
   const [report, receipts, { data: properties }, people] = await Promise.all([
     buildReport(from, to, filters),
-    view === "receipts" ? buildReceiptsReport(from, to) : null,
+    view === "receipts" ? buildReceiptsReport(from, to, exported) : null,
     db().from("properties").select("id, name").order("name"),
     reportPeople(user),
   ]);
@@ -89,14 +108,21 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   );
 
   /** Every link keeps the whole screen, so changing one thing never resets the rest. */
-  const hrefFor = (next: { view?: string; paid?: string; pages?: string }) => {
+  const hrefFor = (next: {
+    view?: string;
+    paid?: string;
+    pages?: string;
+    exported?: string;
+  }) => {
     const search = new URLSearchParams({ from, to });
     const nextView = next.view ?? view;
     const nextPaid = next.paid ?? filters.paid;
     const nextPages = next.pages ?? pages;
+    const nextExported = next.exported ?? exported;
     if (nextView !== "engineer") search.set("view", nextView);
     if (nextPaid !== "all") search.set("paid", nextPaid);
     if (nextPages !== "continuous") search.set("pages", nextPages);
+    if (nextExported !== "unexported") search.set("exported", nextExported);
     if (filters.technicianId) search.set("technician", filters.technicianId);
     if (filters.propertyId) search.set("property", filters.propertyId);
     return `/reports?${search.toString()}`;
@@ -161,6 +187,25 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
           </Link>
         ))}
       </div>
+
+      {view === "receipts" && (
+        <div className="flex gap-2 overflow-x-auto pb-1 print:hidden">
+          {EXPORT_FILTERS.map((option) => (
+            <Link
+              key={option}
+              href={hrefFor({ exported: option })}
+              aria-current={exported === option ? "true" : undefined}
+              className={`chip min-h-9 px-3.5 text-sm ${
+                exported === option
+                  ? "bg-sky-700 text-white"
+                  : "border border-hairline bg-white text-muted"
+              }`}
+            >
+              {EXPORT_LABELS[option]}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {view !== "receipts" && (
         <>
@@ -299,13 +344,17 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
           {receipts.properties.length === 0 ? (
             <p className="card px-4 py-8 text-center text-sm text-muted">
-              No receipts logged in this range.
+              {receipts.filteredOutCount > 0 && exported === "unexported"
+                ? `All ${receipts.filteredOutCount} receipt${
+                    receipts.filteredOutCount === 1 ? "" : "s"
+                  } in this range have already been exported. Try Exported or All receipts.`
+                : "No receipts logged in this range."}
             </p>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3 print:hidden">
                 <a
-                  href={`/api/expenses?from=${from}&to=${to}`}
+                  href={`/api/expenses?from=${from}&to=${to}&exported=${exported}`}
                   className="btn-primary text-center"
                 >
                   Download for QuickBooks
@@ -366,11 +415,18 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
-                            {receipt.receiptPath === null && (
-                              <span className="chip mt-1 bg-amber-100 text-amber-900">
-                                No receipt file
-                              </span>
-                            )}
+                            <span className="mt-1 flex flex-wrap gap-1.5">
+                              {receipt.receiptPath === null && (
+                                <span className="chip bg-amber-100 text-amber-900">
+                                  No receipt file
+                                </span>
+                              )}
+                              {receipt.exportedAt !== null && (
+                                <span className="chip bg-emerald-100 text-emerald-900">
+                                  Exported
+                                </span>
+                              )}
+                            </span>
                           </span>
                           <span
                             className={`shrink-0 text-sm font-bold ${
@@ -403,6 +459,38 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                   attached, so there is nothing to send an accountant for{" "}
                   {receipts.missingFileCount === 1 ? "it" : "them"}.
                 </p>
+              )}
+
+              {receipts.filteredOutCount > 0 && (
+                <p className="px-1 text-xs text-muted">
+                  {receipts.filteredOutCount} more receipt
+                  {receipts.filteredOutCount === 1 ? " in" : "s in"} this range{" "}
+                  {exported === "unexported" ? "already exported" : "not shown by this filter"}.
+                </p>
+              )}
+
+              {exported !== "exported" && (
+                <section className="rounded-2xl border border-hairline bg-white p-4 print:hidden">
+                  <h2 className="text-sm font-bold">Once the expenses are in QuickBooks</h2>
+                  <p className="mt-1 text-xs text-muted">
+                    Marking these exported stops {receipts.count} receipt
+                    {receipts.count === 1 ? "" : "s"} appearing in a later export, so nothing
+                    is sent twice. Do it after the import succeeds, not before.
+                  </p>
+                  <form action={markReceiptsExported} className="mt-3">
+                    <input type="hidden" name="from" value={from} />
+                    <input type="hidden" name="to" value={to} />
+                    <input type="hidden" name="exported" value={exported} />
+                    <ConfirmButton
+                      confirmLabel="Tap again to mark exported"
+                      className="btn-secondary w-full"
+                      confirmClassName="btn w-full bg-brand-600 text-white hover:bg-brand-700"
+                      pendingLabel="Marking…"
+                    >
+                      Mark these receipts as exported
+                    </ConfirmButton>
+                  </form>
+                </section>
               )}
             </>
           )}
