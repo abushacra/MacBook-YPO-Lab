@@ -25,4 +25,12 @@ export const env = {
   get sessionSecret() {
     return required("APP_SESSION_SECRET");
   },
+  /**
+   * Shared secret Vercel Cron sends on a scheduled request. Required rather
+   * than optional: without it the recurring-calls route would be an open
+   * endpoint that creates paid work.
+   */
+  get cronSecret() {
+    return required("CRON_SECRET");
+  },
 };

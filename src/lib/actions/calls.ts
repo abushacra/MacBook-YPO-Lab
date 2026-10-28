@@ -284,12 +284,20 @@ export async function createServiceCall(
 }
 
 export async function setFollowUpResolved(formData: FormData): Promise<void> {
-  await requireUser();
+  const user = await requireUser();
 
   const id = text(formData, "id");
   if (!z.uuid().safeParse(id).success) return;
 
-  await db().from("service_calls").update({ follow_up_needed: false }).eq("id", id);
+  /*
+   * Scoped to what this person can see. It was unscoped before, so anyone
+   * holding a call's id could clear its follow-up flag; an admin-only call
+   * makes that worth closing properly rather than relying on the id being
+   * hard to guess.
+   */
+  let query = db().from("service_calls").update({ follow_up_needed: false }).eq("id", id);
+  if (!user.is_admin) query = query.eq("admin_only", false);
+  await query;
 
   revalidatePath("/");
   revalidatePath("/calls");
@@ -311,11 +319,14 @@ export async function reviewServiceCall(formData: FormData): Promise<void> {
 
   const { data: call } = await db()
     .from("service_calls")
-    .select("id, technician_id, routed_to_chief_id")
+    .select("id, technician_id, routed_to_chief_id, admin_only")
     .eq("id", id)
     .maybeSingle();
 
   if (!call) return;
+  // Belt and braces: these route to no chief, so the check below would refuse
+  // them anyway, but a pay item the person cannot see is not theirs to sign off.
+  if (call.admin_only && !user.is_admin) return;
 
   // Admins can sign off anything, including shifts they logged themselves —
   // they are the backstop for shifts whose author has no chief. A chief is
@@ -367,11 +378,12 @@ export async function approveServiceCalls(formData: FormData): Promise<void> {
 
   const { data: calls } = await db()
     .from("service_calls")
-    .select("id, technician_id, routed_to_chief_id, approval_status")
+    .select("id, technician_id, routed_to_chief_id, approval_status, admin_only")
     .in("id", ids);
 
   const allowed = (calls ?? [])
     .filter((call) => call.approval_status === "pending")
+    .filter((call) => user.is_admin || !call.admin_only)
     .filter(
       (call) =>
         user.is_admin ||

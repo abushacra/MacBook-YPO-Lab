@@ -11,15 +11,24 @@ export const metadata = { title: "Home · Kapa Service Log" };
 export default async function HomePage() {
   const user = await requireUser();
 
+  /*
+   * Admin-only calls are pay items the person being paid is not shown. An
+   * allow-list rather than a conditional filter, so the guard fits inline in
+   * every query below and cannot be forgotten on one of them.
+   */
+  const visible = user.is_admin ? [true, false] : [false];
+
   const pendingQuery = db()
     .from("service_calls")
     .select("id", { count: "exact", head: true })
+    .in("admin_only", visible)
     .eq("approval_status", "pending");
 
   const [{ data: recent }, { data: followUps }, { count: pendingCount }] = await Promise.all([
     db()
       .from("service_calls")
       .select("id, call_date, hours_type, call_type, property_label, space_label, property_label_2, space_label_2, follow_up_needed")
+      .in("admin_only", visible)
       .eq("technician_id", user.id)
       .order("call_date", { ascending: false })
       .order("created_at", { ascending: false })
@@ -27,6 +36,7 @@ export default async function HomePage() {
     db()
       .from("service_calls")
       .select("id, call_date, property_label, space_label")
+      .in("admin_only", visible)
       .eq("follow_up_needed", true)
       .order("call_date", { ascending: false })
       .limit(5),

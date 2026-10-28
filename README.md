@@ -536,6 +536,49 @@ An **Exported** chip shows on the receipt in the list and in the report, the
 way a **Paid** chip shows on a service call. Every receipt logged before this
 existed starts outstanding — nothing was marked retroactively.
 
+## Recurring service calls
+
+Service calls that repeat on a cycle — a standing on-call bonus, a retainer
+visit — created by a daily job rather than typed. A schedule holds the person,
+the property, how many calls each occurrence creates, what each is worth, and
+a start date with an interval in days: *every other Monday from 26 October* is
+a Monday start and an interval of 14.
+
+Nothing is stored per occurrence. The dates are computed from the start date,
+so changing a schedule never leaves a stale queue behind, and the job catches
+up from the start date rather than only looking at today — a day it does not
+run is filled in on the next one instead of losing an occurrence.
+
+**The job is idempotent in the database, not in the code.** Each call is
+written with its schedule id, date and sequence number, and a unique index on
+those three refuses a second copy. A cron that fires twice cannot pay anybody
+twice, and neither can a manual run. It runs daily at 07:00 UTC via
+`vercel.json`, authenticated by `CRON_SECRET` — without that header the route
+does nothing, so a public URL cannot create paid work.
+
+### Admin-only calls
+
+`service_calls.admin_only` marks a pay item the person being paid is not
+shown. Filtered out in the query at every read, so one never reaches a page
+that might render it: the Service Calls list, the call detail page (a 404, not
+a 403 — a 403 would confirm it exists), all three home-screen queries, the
+receipt-linking picker, and the report. The pay run deliberately includes
+them, since it is admin-only anyway and the point is to pay them.
+
+The write paths are guarded too: a chief cannot approve one in bulk or singly,
+and `setFollowUpResolved` — which was unscoped, so anyone holding a call's id
+could clear its follow-up flag — is now scoped to what the caller can see.
+
+### Billing-only people
+
+`technicians.billing_only` marks a record that exists to be paid and never to
+sign in. The sign-in screen lists every active person and lets a PIN-less one
+be claimed by whoever picks it first, so such a record is excluded there —
+**and** refused by the sign-in action, since the id comes off the form and
+hiding a record from a list is not the same as keeping it out of a session.
+`getCurrentUser` refuses one too. It is not the same as inactive: retiring
+someone takes them off the forms, which is a different decision.
+
 ## Properties and QuickBooks customers
 
 A property is not a customer. Several buildings can be reimbursed by one

@@ -10,6 +10,7 @@ import {
   setTechnicianChief,
   setPropertyActive,
   setSpaceActive,
+  setRecurringActive,
   setTechnicianActive,
   setTechnicianAdmin,
 } from "@/lib/actions/admin";
@@ -70,6 +71,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       </div>
 
       {tab === "properties" ? <PropertiesTab /> : <PeopleTab adminId={admin.id} />}
+
+      {tab === "people" && <RecurringTab />}
     </div>
   );
 }
@@ -459,5 +462,77 @@ async function PeopleTab({ adminId }: { adminId: string }) {
         </ul>
       </section>
     </div>
+  );
+}
+
+/**
+ * Service calls that create themselves on a cycle. Admin-only to see and to
+ * stop, because a schedule is a standing instruction to pay somebody.
+ */
+async function RecurringTab() {
+  const [{ data: schedules }, { data: technicians }] = await Promise.all([
+    db()
+      .from("recurring_service_calls")
+      .select(
+        "id, technician_id, property_label, call_count, amount, description, admin_only, start_date, interval_days, active",
+      )
+      .order("created_at"),
+    db().from("technicians").select("id, name"),
+  ]);
+
+  if (!schedules || schedules.length === 0) return null;
+
+  const nameById = new Map((technicians ?? []).map((row) => [row.id, row.name]));
+
+  return (
+    <section className="mt-6">
+      <h2 className="section-heading mb-2">Recurring service calls</h2>
+      <ul className="space-y-3">
+        {schedules.map((schedule) => (
+          <li key={schedule.id} className="card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">
+                  {nameById.get(schedule.technician_id) ?? "Unknown"}
+                </p>
+                <p className="text-xs text-muted">
+                  {schedule.call_count} service call
+                  {schedule.call_count === 1 ? "" : "s"} of {formatMoney(schedule.amount)} at{" "}
+                  {schedule.property_label}, every {schedule.interval_days} days from{" "}
+                  {schedule.start_date}
+                </p>
+                {schedule.description && (
+                  <p className="mt-1 text-xs text-muted">&ldquo;{schedule.description}&rdquo;</p>
+                )}
+              </div>
+              <p className="shrink-0 text-sm font-bold">
+                {formatMoney(schedule.call_count * schedule.amount)}
+              </p>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {schedule.admin_only && (
+                <span className="chip bg-slate-100 text-slate-700">Admin only</span>
+              )}
+              {!schedule.active && (
+                <span className="chip bg-zinc-200 text-zinc-700">Stopped</span>
+              )}
+              <form action={setRecurringActive} className="ml-auto">
+                <input type="hidden" name="id" value={schedule.id} />
+                <input type="hidden" name="active" value={schedule.active ? "false" : "true"} />
+                <button type="submit" className="btn-secondary min-h-10 px-3 text-sm">
+                  {schedule.active ? "Stop" : "Restart"}
+                </button>
+              </form>
+            </div>
+
+            <p className="mt-2 text-xs text-muted">
+              Stopping leaves the service calls already created alone — delete those
+              individually if they should not be paid.
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

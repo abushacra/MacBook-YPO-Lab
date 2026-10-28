@@ -149,6 +149,60 @@ export type Database = {
           },
         ]
       }
+      recurring_service_calls: {
+        Row: {
+          id: string
+          technician_id: string
+          property_id: string
+          property_label: string
+          hours_type: string
+          call_type: string
+          call_count: number
+          amount: number
+          description: string | null
+          admin_only: boolean
+          auto_approve: boolean
+          start_date: string
+          interval_days: number
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          technician_id: string
+          property_id: string
+          property_label: string
+          hours_type?: string
+          call_type?: string
+          call_count?: number
+          amount: number
+          description?: string | null
+          admin_only?: boolean
+          auto_approve?: boolean
+          start_date: string
+          interval_days: number
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          technician_id?: string
+          property_id?: string
+          property_label?: string
+          hours_type?: string
+          call_type?: string
+          call_count?: number
+          amount?: number
+          description?: string | null
+          admin_only?: boolean
+          auto_approve?: boolean
+          start_date?: string
+          interval_days?: number
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       service_call_photos: {
         Row: {
           created_at: string
@@ -180,6 +234,9 @@ export type Database = {
       }
       service_calls: {
         Row: {
+          admin_only: boolean
+          recurring_id: string | null
+          recurrence_seq: number | null
           call_date: string
           call_type: string
           created_at: string
@@ -211,6 +268,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_only?: boolean
+          recurring_id?: string | null
+          recurrence_seq?: number | null
           call_date: string
           call_type: string
           created_at?: string
@@ -242,6 +302,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_only?: boolean
+          recurring_id?: string | null
+          recurrence_seq?: number | null
           call_date?: string
           call_type?: string
           created_at?: string
@@ -368,6 +431,7 @@ export type Database = {
       }
       technicians: {
         Row: {
+          billing_only: boolean
           active: boolean
           company: string | null
           created_at: string
@@ -382,6 +446,7 @@ export type Database = {
           pin_hash: string | null
         }
         Insert: {
+          billing_only?: boolean
           active?: boolean
           company?: string | null
           created_at?: string
@@ -396,6 +461,7 @@ export type Database = {
           pin_hash?: string | null
         }
         Update: {
+          billing_only?: boolean
           active?: boolean
           company?: string | null
           created_at?: string

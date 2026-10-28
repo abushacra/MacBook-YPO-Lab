@@ -22,11 +22,13 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const { data } = await db()
     .from("technicians")
-    .select("id, name, company, kind, is_admin, is_chief, chief_id, active")
+    .select("id, name, company, kind, is_admin, is_chief, chief_id, active, billing_only")
     .eq("id", session.sub)
     .maybeSingle();
 
-  if (!data || !data.active) return null;
+  // A billing-only record is never a signed-in person, so a cookie naming one
+  // is not a session however it came about.
+  if (!data || !data.active || data.billing_only) return null;
 
   return {
     id: data.id,

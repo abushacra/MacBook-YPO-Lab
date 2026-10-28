@@ -440,3 +440,18 @@ export async function resetTechnicianPin(formData: FormData): Promise<void> {
     .eq("id", id);
   refreshAdminViews();
 }
+
+/** Stops a recurring schedule creating any further service calls. */
+export async function setRecurringActive(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = idFrom(formData);
+  if (!id) return;
+
+  await db()
+    .from("recurring_service_calls")
+    .update({ active: text(formData, "active") === "true" })
+    .eq("id", id);
+
+  refreshAdminViews();
+  revalidatePath("/calls");
+}

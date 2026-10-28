@@ -52,6 +52,9 @@ export async function reportFiltersFor(
     visibleTechnicianIds: visible,
     technicianId,
     propertyId: isUuid(requested.propertyId) ? requested.propertyId : null,
+    // Decided here with the rest of the boundary, so the screen and the Excel
+    // download cannot disagree about it.
+    includeAdminOnly: user.is_admin,
   };
 }
 

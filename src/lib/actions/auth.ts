@@ -30,11 +30,19 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
 
   const { data: technician } = await db()
     .from("technicians")
-    .select("id, name, is_admin, pin_hash, active, failed_pin_attempts, locked_until")
+    .select(
+      "id, name, is_admin, pin_hash, active, billing_only, failed_pin_attempts, locked_until",
+    )
     .eq("id", technicianId)
     .maybeSingle();
 
-  if (!technician || !technician.active) {
+  /*
+   * billing_only is refused here as well as hidden from the list: the id comes
+   * off the form, so keeping a record off the screen is not the same as
+   * keeping it out of a sign-in — and a record with no PIN would otherwise be
+   * claimable by whoever posts its id first.
+   */
+  if (!technician || !technician.active || technician.billing_only) {
     return { error: "That name is no longer active. Ask your manager to re-enable it." };
   }
 

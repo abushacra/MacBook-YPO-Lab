@@ -112,6 +112,11 @@ export type ReportFilters = {
   /** Screen down to one person, or one property. Null means all of them. */
   technicianId: string | null;
   propertyId: string | null;
+  /**
+   * Whether calls marked admin-only are in scope. Admins only — these are pay
+   * items the person being paid is not shown.
+   */
+  includeAdminOnly: boolean;
 };
 
 export const PAID_FILTERS = ["unpaid", "paid", "all"] as const;
@@ -126,6 +131,7 @@ export const ALL_CALLS: ReportFilters = {
   visibleTechnicianIds: null,
   technicianId: null,
   propertyId: null,
+  includeAdminOnly: true,
 };
 
 export type ServiceCallReport = {
@@ -172,6 +178,9 @@ export async function buildReport(
     )
     .gte("call_date", from)
     .lte("call_date", to);
+
+  // Admin-only calls belong to no report but an admin's.
+  if (!filters.includeAdminOnly) calls = calls.eq("admin_only", false);
 
   if (filters.paid === "unpaid") calls = calls.is("billed_at", null);
   if (filters.paid === "paid") calls = calls.not("billed_at", "is", null);

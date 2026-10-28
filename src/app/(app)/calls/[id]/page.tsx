@@ -30,7 +30,8 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
     .eq("id", id)
     .maybeSingle();
 
-  if (!call) notFound();
+  // Not found rather than forbidden: a 403 would confirm the call exists.
+  if (!call || (call.admin_only && !user.is_admin)) notFound();
 
   const [{ data: photos }, { data: technician }, { data: expenses }] = await Promise.all([
     db()

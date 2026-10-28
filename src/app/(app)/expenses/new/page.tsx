@@ -25,6 +25,10 @@ export default async function NewExpensePage() {
     .order("call_date", { ascending: false })
     .limit(20);
 
+  // An admin-only call is not something to hang a receipt off unless you are
+  // the admin who can see it.
+  if (!user.is_admin) recentShifts = recentShifts.eq("admin_only", false);
+
   if (!user.is_admin) {
     recentShifts = recentShifts.or(
       `technician_id.eq.${user.id},routed_to_chief_id.eq.${user.id}`,

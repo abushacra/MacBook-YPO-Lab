@@ -74,6 +74,13 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
     .order("created_at", { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
+  /*
+   * Admin-only calls are pay items the person being paid is not shown — a
+   * standing bonus, say. Filtered in the query rather than after it, so one
+   * never reaches a page that might render it.
+   */
+  if (!user.is_admin) query = query.eq("admin_only", false);
+
   if (paid === "unpaid") query = query.is("billed_at", null);
   if (paid === "paid") query = query.not("billed_at", "is", null);
 

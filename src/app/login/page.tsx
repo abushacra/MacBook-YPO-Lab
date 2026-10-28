@@ -13,6 +13,12 @@ export default async function LoginPage() {
     .from("technicians")
     .select("id, name, company, kind, pin_hash")
     .eq("active", true)
+    /*
+     * A billing-only record exists to be paid, never to sign in. This list
+     * lets anyone claim a person who has not set a PIN yet, so leaving one
+     * here would hand out an account — and name it on the sign-in screen.
+     */
+    .eq("billing_only", false)
     .order("name");
 
   const technicians: SignInTechnician[] = (data ?? []).map((row) => ({
