@@ -18,7 +18,19 @@ import { todayISO } from "@/lib/format";
  * anyone create paid work.
  */
 export async function POST(request: Request) {
-  const secret = env.cronSecret;
+  /*
+   * Read inside the guard so a missing secret is a clear 503 rather than an
+   * unhandled crash — and so it still refuses the request either way. Never
+   * falling open is the point: this route creates paid work.
+   */
+  let secret: string;
+  try {
+    secret = env.cronSecret;
+  } catch {
+    console.error("CRON_SECRET is not set, so recurring service calls cannot run");
+    return NextResponse.json({ error: "Scheduling is not configured." }, { status: 503 });
+  }
+
   if (request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Not allowed." }, { status: 401 });
   }
