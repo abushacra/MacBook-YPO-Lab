@@ -442,3 +442,82 @@ export async function deleteServiceCall(formData: FormData): Promise<void> {
   revalidatePath("/expenses");
   redirect("/calls?deleted=1");
 }
+
+/**
+ * Lower bound on a corrected date: the company's work does not predate this,
+ * so anything earlier is a mistyped year rather than a real date.
+ */
+const EARLIEST_CALL_YEAR = 2020;
+
+/**
+ * Whether a typed date is one a service call could have been worked on.
+ *
+ * Separate from the action so the rules can be exercised directly. Three
+ * things go wrong with a typed date: the wrong shape, a shape that is not a
+ * day (2026-02-30 passes a regex and is not a date), and a mistyped year
+ * (2206 for 2026), which is the one that would quietly move a call out of
+ * every report.
+ */
+export function checkCallDate(
+  date: string,
+  today = new Date(),
+): { ok: true } | { ok: false; message: string; fieldMessage: string } {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, message: "Pick a date.", fieldMessage: "Pick a date." };
+  }
+
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    return { ok: false, message: "That is not a real date.", fieldMessage: "Not a real date." };
+  }
+
+  const year = parsed.getUTCFullYear();
+  const latest = today.getUTCFullYear() + 1;
+  if (year < EARLIEST_CALL_YEAR || year > latest) {
+    return {
+      ok: false,
+      message: `Use a date between ${EARLIEST_CALL_YEAR} and ${latest}.`,
+      fieldMessage: "That year looks wrong.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Changes the date a service call was worked. Admin only.
+ *
+ * The date decides which pay run a call lands on and which period a report
+ * counts it in, so a mistyped one has to be correctable — an engineer keying
+ * last Monday's work with today's date is the ordinary case.
+ *
+ * A call already marked paid can still be corrected. The pay run it went out
+ * on is history either way: `billed_at` is what keeps it off a later run, not
+ * its date, so moving the date cannot cause it to be paid twice. What it does
+ * change is which period a report counts it in, which is why the screen says
+ * so before you confirm.
+ */
+export async function setServiceCallDate(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+
+  const id = text(formData, "id");
+  if (!z.uuid().safeParse(id).success) return { error: "Unknown service call." };
+
+  const date = text(formData, "call_date");
+  const checked = checkCallDate(date);
+  if (!checked.ok) {
+    return { error: checked.message, fieldErrors: { call_date: checked.fieldMessage } };
+  }
+
+  const { error } = await db().from("service_calls").update({ call_date: date }).eq("id", id);
+  if (error) return { error: "Could not change the date." };
+
+  // Every screen that reads a date: the lists, the call itself, and the pay
+  // run and report windows this call may have just moved between.
+  revalidatePath("/");
+  revalidatePath("/calls");
+  revalidatePath(`/calls/${id}`);
+  revalidatePath("/payrun");
+  revalidatePath("/reports");
+  return { ok: true };
+}

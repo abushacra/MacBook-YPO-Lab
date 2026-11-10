@@ -148,6 +148,23 @@ calls are set null.
 The `technician_usage` view is what the admin screen reads to decide which
 control to show, and to say why when the answer is no.
 
+### Changing a service call's date
+
+An admin gets a **Change the date** panel on the service call screen. The date
+decides which pay run a call lands on and which period a report counts it in,
+so a mis-keyed one — an engineer logging last Monday's work with today's date —
+has to be correctable.
+
+Three things are refused: a badly shaped date, a well-shaped one that is not a
+day (`2026-02-30` passes a regex and is not a date), and a year outside 2020
+to next year, which is the mistype that would otherwise move a call quietly out
+of every report. The upper bound follows the clock rather than being frozen.
+
+**A paid call can still be corrected.** What keeps a call off a later pay run is
+`billed_at`, not its date, so moving the date cannot cause it to be paid twice.
+What it does change is which period a report counts it in, and the panel says so
+before you confirm.
+
 ### Deleting a service call
 
 An admin gets a **Delete service call** control at the bottom of any service call, behind a

@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/calls";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { ApprovalBadge, CallTypeBadge, HoursBadge } from "@/components/call-badges";
+import { CallDateForm } from "@/components/call-date-form";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 
@@ -229,6 +230,21 @@ export default async function ServiceCallPage({ params, searchParams }: PageProp
               );
             })}
           </ul>
+        </section>
+      )}
+
+      {user.is_admin && (
+        <section className="card p-4">
+          <h2 className="text-sm font-bold">Change the date</h2>
+          <p className="mt-1 text-xs text-muted">
+            The date decides which pay run this call lands on and which period a report
+            counts it in. Correcting a mis-keyed one is what this is for.
+          </p>
+          <CallDateForm
+            callId={call.id}
+            callDate={call.call_date}
+            paid={call.billed_at !== null}
+          />
         </section>
       )}
 
