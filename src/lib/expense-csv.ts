@@ -103,10 +103,15 @@ export function expenseCsv(report: ReceiptsReport): string {
         usDate(receipt.date),
         EXPENSE_PAYMENT_METHOD,
         BILL_LOCATION,
-        // The ref, so the expense can be found from the receipt file and back
-        // without opening the line, then the merchant, so a statement can be
-        // reconciled from the memo column alone.
-        [ref, receipt.merchant, `logged by ${receipt.loggedBy}`]
+        /*
+         * The property leads, so a memo says which building the charge was
+         * for without crossing to the Customer/Project column — which several
+         * buildings share, so that column cannot tell them apart. Then the
+         * ref, so the expense can be found from the receipt file and back
+         * without opening the line, then the merchant, so a statement can be
+         * reconciled from the memo column alone.
+         */
+        [group.propertyName, ref, receipt.merchant, `logged by ${receipt.loggedBy}`]
           .filter((part): part is string => Boolean(part))
           .join(" · "),
         "Category Details",

@@ -491,7 +491,7 @@ Receipts**, and downloads a ZIP holding three things:
 
 | In the ZIP | What it is |
 | --- | --- |
-| `expenses.csv` | The QuickBooks expense import, one row per receipt. |
+| `expenses.csv` | The QuickBooks expense import, one row per receipt. Its **Memo** opens with the property, then the Ref No., the merchant and who logged it. |
 | `receipts/<property>.pdf` | **One combined PDF per property**, that property's receipts a page each. |
 | `receipts-manifest.csv` | Every Ref No. with the PDF and page number holding its receipt. |
 
